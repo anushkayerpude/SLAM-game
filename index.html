@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Ghost Hunt AR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{color-scheme:dark;--bg:#07070c;--fg:#e8e8f0;--acc:#7cffb2;--red:#ff2b44;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;overflow:hidden;touch-action:none}
+canvas{display:block}
+#ui{position:fixed;inset:0;pointer-events:none}
+.p{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92%,380px);background:rgba(8,8,14,.88);border:1px solid #333;border-radius:16px;padding:20px;text-align:center;pointer-events:auto;display:none}
+.p h1{margin:0 0 6px;color:var(--acc);font-size:26px}.p p{margin:6px 0;font-size:14px;opacity:.85}
+button{font:inherit;background:#17171f;color:var(--fg);border:1px solid #444;border-radius:10px;padding:10px 14px;margin:4px;cursor:pointer}
+button.m{background:var(--acc);color:#04120a;border:0;font-weight:700}button.on{outline:2px solid var(--acc)}
+#hud{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:0;right:0;text-align:center;display:none;font-size:15px;text-shadow:0 0 6px #000}
+#bar{width:60%;max-width:260px;height:10px;margin:6px auto;border:1px solid #888;border-radius:6px;overflow:hidden;background:#0008}
+#fill{height:100%;width:0;background:linear-gradient(90deg,#3ad,#fd3,#f23)}
+#vig{position:absolute;inset:0;display:none;background:radial-gradient(circle,transparent 18%,rgba(0,0,0,.92) 70%);animation:fl 3s infinite}
+@keyframes fl{0%,90%,100%{opacity:1}93%{opacity:.6}96%{opacity:.9}}
+#scare{position:absolute;inset:0;background:#000;display:none;pointer-events:auto}
+#scare canvas{width:100%;height:100%;animation:sh .07s infinite}
+@keyframes sh{0%{transform:translate(-8px,5px) scale(1.06)}50%{transform:translate(9px,-6px) scale(1.12)}100%{transform:translate(-5px,-8px) scale(1.06)}}
+#flash{position:absolute;inset:0;background:#fff;animation:fa .5s steps(2) 3;pointer-events:none}
+@keyframes fa{50%{opacity:0}}
+small{opacity:.6;font-size:12px}
+</style></head><body>
+<div id="ui">
+ <div id="vig"></div>
+ <div id="hud"><div id="lv"></div><div id="tm"></div><div id="bar"><div id="fill"></div></div><div id="hint"></div></div>
+ <div class="p" id="menu">
+  <h1>👻 Ghost Hunt</h1>
+  <p>A ghost hides in your room. Walk, listen, and find it. The louder the sound, the closer you are.</p>
+  <div><button data-l="easy" class="on">Easy</button><button data-l="moderate">Moderate</button><button data-l="hard">Difficult</button></div>
+  <p id="ld"></p>
+  <button class="m" id="bAR">Start AR (Android Chrome)</button><br>
+  <button id="bDemo">Play Demo Mode (any device)</button>
+  <p><small>⚠ Loud screams and flashing images. Use headphones. Not for people with heart conditions or photosensitivity.</small></p>
+  <p><small>Optional: add your own scare images <input type="file" id="up" accept="image/*" multiple style="max-width:150px"></small></p>
+ </div>
+ <div class="p" id="scan"><h1>Scanning room…</h1><p>Move your phone slowly, pointing at the floor and walls. Green and purple grids are detected surfaces. When ready, stand where you want to start.</p><button class="m" id="bGo">Start Hunt</button></div>
+ <div class="p" id="res"><h1 id="rt"></h1><p id="rp"></p><button class="m" id="bAgain">Play Again</button><button id="bMenu">Menu</button></div>
+ <div id="scare"><canvas id="sc"></canvas><div id="flash"></div></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=id=>document.getElementById(id),show=(id,v=true)=>$(id).style.display=v?(id==='hud'||id==='vig'||id==='scare'?'block':'block'):'none';
+const LV={
+ easy:{n:'Easy',r:3,t:0,hint:true,wander:0,find:1.0,d:'Ghost within 3 m. No timer. Hot/cold meter on.'},
+ moderate:{n:'Moderate',r:5,t:90,hint:true,wander:0,find:.9,d:'Ghost within 5 m. 90 second timer.'},
+ hard:{n:'Difficult',r:8,t:60,hint:false,wander:.25,find:.8,d:'Ghost within 8 m, wanders, dark vision, no meter. 60 seconds.'}};
+let level='easy',state='menu',xrMode=false,session=null,hitSrc=null,refSpace=null,lastFloorY=0,floorY=0,timeLeft=0,t0=0,R=3,tgt=null;
+const camPos=new THREE.Vector3(0,1.6,0),camFwd=new THREE.Vector3(0,0,-1),ghost=new THREE.Vector3(),origin=new THREE.Vector3(),custom=[];
+
+/* ---------- Three.js scene ---------- */
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(devicePixelRatio);renderer.setSize(innerWidth,innerHeight);renderer.xr.enabled=true;document.body.prepend(renderer.domElement);
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.05,50);
+scene.background=new THREE.Color(0x05050a);scene.fog=new THREE.Fog(0x05050a,2,9);
+function gridTex(rep){const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');g.strokeStyle='#fff';g.lineWidth=5;g.strokeRect(0,0,128,128);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rep,rep);return t}
+const mk=(col,rep)=>new THREE.MeshBasicMaterial({map:gridTex(rep),color:col,transparent:true,opacity:.55,side:THREE.DoubleSide,depthWrite:false});
+const matH=mk(0x45ff9a,2),matV=mk(0xa070ff,2);
+/* demo room */
+const demo=new THREE.Group();scene.add(demo);
+const fl=new THREE.Mesh(new THREE.PlaneGeometry(10,10),mk(0x45ff9a,20));fl.rotation.x=-Math.PI/2;demo.add(fl);
+[[0,-5,0],[0,5,0],[-5,0,1],[5,0,1]].forEach(([x,z,r])=>{const w=new THREE.Mesh(new THREE.PlaneGeometry(10,2.6),mk(0xa070ff,20));w.position.set(x,1.3,z);w.rotation.y=r?Math.PI/2:0;demo.add(w)});
+for(let i=0;i<7;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(.6+Math.random(),.5+Math.random(),.6+Math.random()),mk(0xff8a45,2));b.position.set((Math.random()-.5)*8,.4,(Math.random()-.5)*8);demo.add(b)}
+/* reticle */
+const reticle=new THREE.Mesh(new THREE.RingGeometry(.12,.16,32).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0x7cffb2}));
+reticle.matrixAutoUpdate=false;reticle.visible=false;scene.add(reticle);
+const planeMeshes=new Map();
+
+/* ---------- Audio (spatial + heartbeat + scream) ---------- */
+let actx,master,pan,gGain;
+function initAudio(){
+ if(actx){actx.resume();return}
+ actx=new(window.AudioContext||window.webkitAudioContext)();
+ master=actx.createDynamicsCompressor();master.connect(actx.destination);
+ pan=actx.createPanner();pan.panningModel='HRTF';pan.distanceModel='inverse';pan.refDistance=.6;pan.rolloffFactor=1.2;
+ gGain=actx.createGain();gGain.gain.value=0;gGain.connect(pan);pan.connect(master);
+ [[110,'sawtooth'],[164.8,'sine'],[233,'sine']].forEach(([f,ty],i)=>{
+  const o=actx.createOscillator(),l=actx.createOscillator(),lg=actx.createGain(),og=actx.createGain();
+  o.type=ty;o.frequency.value=f;l.frequency.value=.3+i*.25;lg.gain.value=f*.03;og.gain.value=.18;
+  l.connect(lg);lg.connect(o.frequency);o.connect(og);og.connect(gGain);o.start();l.start()});
+ const nb=actx.createBuffer(1,actx.sampleRate*2,actx.sampleRate),d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+ const ns=actx.createBufferSource();ns.buffer=nb;ns.loop=true;
+ const bp=actx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1800;bp.Q.value=4;
+ const wl=actx.createOscillator(),wg=actx.createGain(),ng=actx.createGain();wl.frequency.value=.4;wg.gain.value=.15;ng.gain.value=.2;
+ wl.connect(wg);wg.connect(ng.gain);ns.connect(bp);bp.connect(ng);ng.connect(gGain);ns.start();wl.start();
+}
+function setP(node,p){if(node.positionX){node.positionX.value=p.x;node.positionY.value=p.y;node.positionZ.value=p.z}else node.setPosition(p.x,p.y,p.z)}
+function listener(){const L=actx.listener;if(L.positionX){L.positionX.value=camPos.x;L.positionY.value=camPos.y;L.positionZ.value=camPos.z;
+ L.forwardX.value=camFwd.x;L.forwardY.value=camFwd.y;L.forwardZ.value=camFwd.z;L.upX.value=0;L.upY.value=1;L.upZ.value=0}
+ else{L.setPosition(camPos.x,camPos.y,camPos.z);L.setOrientation(camFwd.x,camFwd.y,camFwd.z,0,1,0)}}
+let prox=0;
+function beat(){
+ if(state!=='play')return;
+ const t=actx.currentTime,o=actx.createOscillator(),g=actx.createGain();
+ o.frequency.setValueAtTime(70,t);o.frequency.exponentialRampToValueAtTime(40,t+.15);
+ g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.15+prox*.85,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+.25);
+ o.connect(g);g.connect(master);o.start(t);o.stop(t+.3);
+ setTimeout(beat,1200-prox*850);
+}
+function scream(){
+ const t=actx.currentTime,g=actx.createGain();
+ g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(1,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+1.9);g.connect(master);
+ [700,1050,1400,2100].forEach(b=>{
+  const o=actx.createOscillator(),v=actx.createOscillator(),vg=actx.createGain(),og=actx.createGain();
+  o.type='sawtooth';o.frequency.setValueAtTime(b,t);o.frequency.exponentialRampToValueAtTime(b*2.2,t+.5);o.frequency.exponentialRampToValueAtTime(b*1.4,t+1.8);
+  v.frequency.value=13;vg.gain.value=b*.06;v.connect(vg);vg.connect(o.frequency);og.gain.value=.3;o.connect(og);og.connect(g);
+  o.start(t);v.start(t);o.stop(t+1.9);v.stop(t+1.9)});
+ const nb=actx.createBuffer(1,actx.sampleRate*1.5,actx.sampleRate),d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+ const ns=actx.createBufferSource(),hp=actx.createBiquadFilter();ns.buffer=nb;hp.type='highpass';hp.frequency.value=1500;ns.connect(hp);hp.connect(g);ns.start(t);
+}
+
+/* ---------- Random ghost faces ---------- */
+function drawGhost(c){
+ const w=c.width=innerWidth,h=c.height=innerHeight,g=c.getContext('2d'),r=Math.random;
+ if(custom.length&&r()<.5){const im=custom[Math.floor(r()*custom.length)],s=Math.max(w/im.width,h/im.height);g.fillStyle='#000';g.fillRect(0,0,w,h);g.drawImage(im,(w-im.width*s)/2,(h-im.height*s)/2,im.width*s,im.height*s);return}
+ const cx=w/2,cy=h*.5,fw=Math.min(w,h)*(.34+r()*.1),fh=fw*1.45;
+ const bg=g.createRadialGradient(cx,cy,10,cx,cy,Math.max(w,h)*.6);bg.addColorStop(0,`hsl(${r()<.5?0:200},70%,${12+r()*10}%)`);bg.addColorStop(1,'#000');g.fillStyle=bg;g.fillRect(0,0,w,h);
+ g.strokeStyle='#000';g.lineWidth=3;
+ for(let i=0;i<140;i++){const x=cx+(r()-.5)*fw*1.6;g.beginPath();g.moveTo(x,cy-fh*.5);g.bezierCurveTo(x+(r()-.5)*120,cy,x+(r()-.5)*200,cy+fh*.6,x+(r()-.5)*260,h);g.stroke()}
+ const fg=g.createRadialGradient(cx,cy-fh*.1,fw*.1,cx,cy,fh*.6);fg.addColorStop(0,'#f4f4ea');fg.addColorStop(1,'#6d7068');
+ g.fillStyle=fg;g.beginPath();g.ellipse(cx,cy,fw*.5,fh*.5,0,0,7);g.fill();
+ const ey=cy-fh*.1,ex=fw*(.17+r()*.06),er=fw*(.09+r()*.07);
+ for(const s of[-1,1]){g.fillStyle='#000';g.beginPath();g.ellipse(cx+s*ex,ey,er,er*(1.3+r()*.8),s*.2,0,7);g.fill();g.fillStyle='rgba(255,40,40,.9)';g.beginPath();g.arc(cx+s*ex,ey,3+r()*4,0,7);g.fill()}
+ const my=cy+fh*.24;g.fillStyle='#000';g.beginPath();g.ellipse(cx,my,fw*(.12+r()*.12),fh*(.1+r()*.12),0,0,7);g.fill();
+ g.strokeStyle='#a00';g.lineWidth=5;
+ for(let i=0;i<7;i++){const x=cx+(r()-.5)*fw*.4;g.beginPath();g.moveTo(x,my);g.lineTo(x+(r()-.5)*30,my+fh*(.1+r()*.3));g.stroke()}
+ g.strokeStyle='rgba(0,0,0,.5)';g.lineWidth=1.5;for(let i=0;i<8;i++){g.beginPath();g.moveTo(cx+(r()-.5)*fw,cy-fh*.4);g.lineTo(cx+(r()-.5)*fw,cy+(r()-.5)*fh*.3);g.stroke()}
+ const id=g.getImageData(0,0,w,h),dd=id.data;for(let i=0;i<dd.length;i+=4){const n=(r()-.5)*50;dd[i]+=n;dd[i+1]+=n;dd[i+2]+=n}g.putImageData(id,0,0);
+}
+$('up').onchange=e=>[...e.target.files].forEach(f=>{const im=new Image();im.onload=()=>custom.push(im);im.src=URL.createObjectURL(f)});
+
+/* ---------- Game flow ---------- */
+document.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{level=b.dataset.l;document.querySelectorAll('[data-l]').forEach(x=>x.classList.toggle('on',x===b));$('ld').textContent=LV[level].d});
+$('ld').textContent=LV.easy.d;
+function hideAll(){['menu','scan','res','hud','vig','scare'].forEach(i=>show(i,false))}
+function menu(){state='menu';hideAll();show('menu')}
+function scanMode(){state='scan';hideAll();show('scan')}
+function begin(){
+ const L=LV[level];initAudio();hideAll();
+ floorY=xrMode?(reticle.visible?lastFloorY:camPos.y-1.4):0;R=xrMode?L.r:Math.min(L.r,4.2);
+ origin.copy(camPos);const a=Math.random()*6.283,d=R*(.55+.45*Math.random());
+ ghost.set(camPos.x+Math.cos(a)*d,floorY+1,camPos.z+Math.sin(a)*d);
+ if(!xrMode){ghost.x=Math.max(-4.4,Math.min(4.4,ghost.x));ghost.z=Math.max(-4.4,Math.min(4.4,ghost.z))}
+ tgt=null;timeLeft=L.t;t0=performance.now();state='play';
+ $('lv').textContent='Level: '+L.n;$('bar').style.display=L.hint?'block':'none';show('hud');if(level==='hard')show('vig');beat();
+}
+function scare(kind){
+ state='scare';gGain.gain.value=0;scream();navigator.vibrate&&navigator.vibrate([300,100,300,100,600]);
+ drawGhost($('sc'));hideAll();show('scare');
+ setTimeout(()=>{show('scare',false);result(kind)},2600);
+}
+function result(kind){
+ state='result';const s=((performance.now()-t0)/1000).toFixed(1);
+ $('rt').textContent=kind==='win'?'You found it! 😱':'Time up… it found YOU 💀';
+ $('rp').textContent=kind==='win'?'Level '+LV[level].n+' cleared in '+s+' seconds.':'The ghost got tired of waiting.';
+ show('res');
+}
+$('bAgain').onclick=()=>xrMode?scanMode():begin();
+$('bMenu').onclick=()=>session?session.end():menu();
+$('bGo').onclick=begin;
+$('bDemo').onclick=()=>{initAudio();xrMode=false;demo.visible=true;scene.background=new THREE.Color(0x05050a);camPos.set(0,1.6,0);yaw=0;pitch=0;begin()};
+
+/* ---------- WebXR ---------- */
+if(!(navigator.xr&&navigator.xr.isSessionSupported)){$('bAR').textContent='AR not supported here (use Demo Mode)';$('bAR').disabled=true}
+else navigator.xr.isSessionSupported('immersive-ar').then(ok=>{if(!ok){$('bAR').textContent='AR not supported here (use Demo Mode)';$('bAR').disabled=true}});
+$('bAR').onclick=async()=>{
+ initAudio();
+ try{session=await navigator.xr.requestSession('immersive-ar',{requiredFeatures:['hit-test'],optionalFeatures:['plane-detection','dom-overlay'],domOverlay:{root:$('ui')}})}
+ catch(e){alert('AR failed: '+e.message);return}
+ renderer.xr.setReferenceSpaceType('local');await renderer.xr.setSession(session);refSpace=renderer.xr.getReferenceSpace();
+ hitSrc=await session.requestHitTestSource({space:await session.requestReferenceSpace('viewer')});
+ xrMode=true;demo.visible=false;scene.background=null;scene.fog=null;
+ session.addEventListener('end',()=>{xrMode=false;session=null;hitSrc=null;reticle.visible=false;planeMeshes.forEach(m=>scene.remove(m));planeMeshes.clear();scene.background=new THREE.Color(0x05050a);demo.visible=true;menu()});
+ scanMode();
+};
+function xrFrame(f){
+ const vp=f.getViewerPose(refSpace);
+ if(vp){const p=vp.transform.position,o=vp.transform.orientation;camPos.set(p.x,p.y,p.z);camFwd.set(0,0,-1).applyQuaternion(new THREE.Quaternion(o.x,o.y,o.z,o.w))}
+ if(hitSrc){const h=f.getHitTestResults(hitSrc);
+  if(h.length){const pose=h[0].getPose(refSpace);if(pose&&pose.transform.matrix[5]>.8){reticle.visible=true;reticle.matrix.fromArray(pose.transform.matrix);reticle.matrixWorldNeedsUpdate=true;lastFloorY=pose.transform.position.y}else reticle.visible=false}else reticle.visible=false}
+ if(f.detectedPlanes){
+  for(const [p,m] of planeMeshes)if(!f.detectedPlanes.has(p)){scene.remove(m);m.geometry.dispose();planeMeshes.delete(p)}
+  f.detectedPlanes.forEach(p=>{
+   let m=planeMeshes.get(p);
+   if(!m||m.userData.t!==p.lastChangedTime){
+    if(m){scene.remove(m);m.geometry.dispose()}
+    const sh=new THREE.Shape(p.polygon.map(q=>new THREE.Vector2(q.x,-q.z)));
+    m=new THREE.Mesh(new THREE.ShapeGeometry(sh).rotateX(-Math.PI/2),p.orientation==='vertical'?matV:matH);
+    m.matrixAutoUpdate=false;m.userData.t=p.lastChangedTime;scene.add(m);planeMeshes.set(p,m)}
+   const pose=f.getPose(p.planeSpace,refSpace);if(pose){m.matrix.fromArray(pose.transform.matrix);m.matrixWorldNeedsUpdate=true}
+  });
+ }
+}
+
+/* ---------- Demo mode controls ---------- */
+let yaw=0,pitch=0;const keys={},ptrs=new Map();
+addEventListener('keydown',e=>keys[e.code]=1);addEventListener('keyup',e=>keys[e.code]=0);
+renderer.domElement.addEventListener('pointerdown',e=>{ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,mv:e.pointerType==='touch'&&e.clientX<innerWidth/2})});
+addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;if(!p.mv){yaw-=(e.clientX-p.x)*.005;pitch=Math.max(-1.2,Math.min(1.2,pitch-(e.clientY-p.y)*.005))}p.x=e.clientX;p.y=e.clientY});
+addEventListener('pointerup',e=>ptrs.delete(e.pointerId));addEventListener('pointercancel',e=>ptrs.delete(e.pointerId));
+function demoMove(dt){
+ let f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0),s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
+ ptrs.forEach(p=>{if(p.mv){f+=Math.max(-1,Math.min(1,(p.sy-p.y)/60));s+=Math.max(-1,Math.min(1,(p.x-p.sx)/60))}});
+ const v=1.8*dt,sn=Math.sin(yaw),cs=Math.cos(yaw);
+ camPos.x=Math.max(-4.6,Math.min(4.6,camPos.x+(-sn*f+cs*s)*v));camPos.z=Math.max(-4.6,Math.min(4.6,camPos.z+(-cs*f-sn*s)*v));
+ camera.position.copy(camPos);camera.rotation.set(pitch,yaw,0,'YXZ');camera.getWorldDirection(camFwd);
+}
+
+/* ---------- Main loop ---------- */
+const clock=new THREE.Clock();
+function tick(dt){
+ const L=LV[level],d=Math.hypot(camPos.x-ghost.x,camPos.z-ghost.z);
+ prox=Math.max(0,Math.min(1,1-d/(R*1.1)));
+ setP(pan,ghost);listener();gGain.gain.value=.05+Math.pow(prox,1.5)*.9;
+ if(L.wander){
+  if(!tgt||Math.hypot(tgt.x-ghost.x,tgt.z-ghost.z)<.2){const a=Math.random()*6.283,r=R*Math.random();tgt={x:origin.x+Math.cos(a)*r,z:origin.z+Math.sin(a)*r}}
+  const dx=tgt.x-ghost.x,dz=tgt.z-ghost.z,l=Math.hypot(dx,dz)||1;ghost.x+=dx/l*L.wander*dt;ghost.z+=dz/l*L.wander*dt;
+  if(!xrMode){ghost.x=Math.max(-4.4,Math.min(4.4,ghost.x));ghost.z=Math.max(-4.4,Math.min(4.4,ghost.z))}}
+ $('fill').style.width=(prox*100)+'%';
+ $('hint').textContent=L.hint?(prox>.85?'🔥 Burning!':prox>.6?'Hot':prox>.3?'Warm':'Cold'):'Listen carefully…';
+ if(L.t){timeLeft=L.t-(performance.now()-t0)/1000;$('tm').textContent='⏱ '+Math.max(0,Math.ceil(timeLeft))+'s';if(timeLeft<=0)return scare('lose')}
+ else $('tm').textContent='No timer';
+ if(d<L.find)scare('win');
+}
+renderer.setAnimationLoop((t,f)=>{
+ const dt=Math.min(clock.getDelta(),.1);
+ if(xrMode&&f)xrFrame(f);else if(!xrMode&&(state==='play'||state==='result'||state==='scare'))demoMove(dt);
+ if(state==='play')tick(dt);
+ renderer.render(scene,camera);
+});
+addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()});
+menu();
+</script></body></html>
