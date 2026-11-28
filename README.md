@@ -30,7 +30,8 @@ The game models real-world robotics and spatial perception principles directly i
 | **Acoustic Propagation** | Centralized quadratic inverse-square sound falloff | `Stealth/NoiseSystem.cs`: Dispatches noise events from pulses, sprinting, and defusals to alert the AI. |
 | **Guard AI State Machine** | Dynamic NavMesh agent perception (Vision cone + Sound hearing) | `AI/GuardAI.cs`: 5 states: `Patrol`, `Investigate`, `Chase`, `Search`, and `Eliminated`. |
 | **Takedown Mechanic** | Directional dot-product angle & distance verification | `Player/TakedownAction.cs`: Silent takedown (`F`) from behind crouched guards. |
-| **Mission Objective** | Multi-target interaction & shared countdown timer | `Objectives/BombObjective.cs` & `Core/GameManager.cs`: 3 bombs, 6:00 shared timer, extraction zone escape. |
+| **Ominous Dynamic Soundtrack** | Adaptive state-driven ambient music controller | `Audio/OminousSoundtrackManager.cs`: 48s seamless D-minor sub-bass orchestral drone with heartbeat sub-impacts and tension modulation. |
+| **Mission Objective** | Multi-target interaction & shared countdown timer | `Objectives/BombObjective.cs` & `Core/GameManager.cs`: 3 bombs, 10:00 relaxed timer, extraction zone escape. |
 
 ---
 
@@ -65,8 +66,10 @@ The game models real-world robotics and spatial perception principles directly i
    - Guard chase speed has been rebalanced to `3.8m/s` (player walks at `3.6m/s` and sprints at `6.4m/s`). Simply sprinting away easily breaks line of sight.
 4. **Relaxed Mission Timer**:
    - The global timer is set to a generous **10:00 minutes** (with an optional untimed `detectiveMode` toggle).
-5. **Procedural Audio Engine**:
-   - In-game audio (LiDAR sonar chirp, 3-note defusal success chord, guard alert tones, and smoke whoosh) is synthesized procedurally in C# via `AudioClip.Create` — zero external asset dependencies required.
+5. **Procedural Audio & Dynamic Ominous Soundtrack**:
+   - Features `Assets/Audio/Ominous_Vigilante_Theme.wav` (48-second seamless stereo loop in D-minor featuring low sub-bass drone, pulsating heartbeat thumps, and dark string pad swells).
+   - Driven by `OminousSoundtrackManager.cs`: music dynamically modulates pitch and volume based on guard awareness (rising smoothly during suspicious detection and peaking during chase pursuit).
+   - In-game SFX (LiDAR sonar chirp, 3-note defusal success chord, guard alert tones, and smoke whoosh) synthesized procedurally in C#.
 
 ---
 

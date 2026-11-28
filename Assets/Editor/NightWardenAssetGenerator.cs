@@ -8,6 +8,7 @@ using UnityEngine.Rendering.Universal;
 using NightWarden.Player;
 using NightWarden.SLAM;
 using NightWarden.UI;
+using NightWarden.Audio;
 
 namespace NightWarden.EditorTools
 {
@@ -32,6 +33,7 @@ namespace NightWarden.EditorTools
             ConfigureShadowDistance(40f);
             CreateGlobalVolumeProfile();
             BuildTacticalVigilanteAndLightingInActiveScene();
+            SetupOminousSoundtrack();
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -802,6 +804,26 @@ namespace NightWarden.EditorTools
             {
                 SetLayerRecursively(child.gameObject, layer);
             }
+        }
+
+        public static void SetupOminousSoundtrack()
+        {
+            GameObject audioObj = GameObject.Find("[Audio_Soundtrack]");
+            if (audioObj == null)
+            {
+                audioObj = new GameObject("[Audio_Soundtrack]");
+            }
+
+            var manager = audioObj.GetComponent<OminousSoundtrackManager>();
+            if (manager == null) manager = audioObj.AddComponent<OminousSoundtrackManager>();
+
+            string clipPath = "Assets/Audio/Ominous_Vigilante_Theme.wav";
+            AudioClip clip = AssetDatabase.LoadAssetAtPath<AudioClip>(clipPath);
+            if (clip != null)
+            {
+                manager.SetAudioClip(clip);
+            }
+            Debug.Log("<color=#a78bfa><b>[Night Warden]</b> Ominous ambient soundtrack configured successfully!</color>");
         }
     }
 }
