@@ -24,9 +24,14 @@ namespace NightWarden.Core
         public static GameManager Instance { get; private set; }
 
         [Header("Mission Parameters")]
-        [SerializeField] private float totalTimeSeconds = 360f; // 6:00 shared bomb timer
+        [SerializeField] private float totalTimeSeconds = 600f; // 10:00 relaxed timer for non-gamers
+        [SerializeField] private bool detectiveMode = false; // When true, timer is paused for casual free-roam
         [SerializeField] private int totalBombsRequired = 3;
         [SerializeField] private GameObject extractionPoint;
+
+        [Header("Tactical Accessibility")]
+        [SerializeField] private int maxSmokePellets = 3; // Second chances on guard contact
+        private int _smokePelletsRemaining = 3;
 
         [Header("State")]
         [SerializeField] private GameState currentState = GameState.Playing;
@@ -37,6 +42,7 @@ namespace NightWarden.Core
 
         public event Action<GameState> OnGameStateChanged;
         public event Action<int, int> OnBombProgressChanged; // (defused, total)
+        public event Action<int> OnSmokePelletUsed; // (charges remaining)
 
         public GameState CurrentState => currentState;
         public float TimeRemaining => Mathf.Max(0f, _timeRemaining);
@@ -44,6 +50,8 @@ namespace NightWarden.Core
         public int TotalBombs => totalBombsRequired;
         public bool AreAllBombsDefused => _bombsDefusedCount >= totalBombsRequired;
         public string EndGameReason => _endGameReason;
+        public int SmokePelletsRemaining => _smokePelletsRemaining;
+        public bool IsDetectiveMode => detectiveMode;
 
         private void Awake()
         {
@@ -67,11 +75,14 @@ namespace NightWarden.Core
         {
             if (currentState == GameState.Playing)
             {
-                _timeRemaining -= Time.deltaTime;
-
-                if (_timeRemaining <= 0f)
+                if (!detectiveMode)
                 {
-                    TriggerGameOver("The explosive devices detonated across the district.");
+                    _timeRemaining -= Time.deltaTime;
+
+                    if (_timeRemaining <= 0f)
+                    {
+                        TriggerGameOver("The explosive devices detonated across the district.");
+                    }
                 }
 
                 // Pause toggle on Escape
@@ -87,6 +98,23 @@ namespace NightWarden.Core
                     SetGameState(GameState.Playing);
                 }
             }
+        }
+
+        public bool TryDeploySmokePellet()
+        {
+            if (_smokePelletsRemaining > 0)
+            {
+                _smokePelletsRemaining--;
+                OnSmokePelletUsed?.Invoke(_smokePelletsRemaining);
+                return true;
+            }
+            return false;
+        }
+
+        public void RestoreSmokePellets(int count)
+        {
+            _smokePelletsRemaining = Mathf.Min(maxSmokePellets, _smokePelletsRemaining + count);
+            OnSmokePelletUsed?.Invoke(_smokePelletsRemaining);
         }
 
         public void SetGameState(GameState newState)

@@ -35,6 +35,34 @@ namespace NightWarden.Objectives
             var player = GameObject.FindWithTag("Player");
             if (player != null) _playerTransform = player.transform;
             if (audioSource == null) audioSource = GetComponent<AudioSource>();
+
+            if (defusedSound == null)
+            {
+                defusedSound = CreateSuccessChimeClip();
+            }
+        }
+
+        private AudioClip CreateSuccessChimeClip()
+        {
+            int sampleRate = 44100;
+            float duration = 0.55f;
+            int count = Mathf.FloorToInt(sampleRate * duration);
+            float[] samples = new float[count];
+            // 3-note ascending arpeggio: C5 (523Hz), E5 (659Hz), G5 (784Hz)
+            float[] notes = { 523.25f, 659.25f, 783.99f };
+            float noteDur = duration / notes.Length;
+
+            for (int i = 0; i < count; i++)
+            {
+                float t = (float)i / sampleRate;
+                int noteIdx = Mathf.Min(notes.Length - 1, Mathf.FloorToInt(t / noteDur));
+                float noteT = t - noteIdx * noteDur;
+                float env = Mathf.Sin(Mathf.Clamp01(noteT / noteDur) * Mathf.PI);
+                samples[i] = Mathf.Sin(2f * Mathf.PI * notes[noteIdx] * t) * env * 0.45f;
+            }
+            AudioClip clip = AudioClip.Create("BombDefusedSuccess", count, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
 
         private void Update()

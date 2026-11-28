@@ -35,11 +35,19 @@ namespace NightWarden.SLAM
         [Header("Audio & Wave VFX")]
         [SerializeField] private AudioSource audioSource;
         [SerializeField] private AudioClip pulseSound;
-        [SerializeField] private float noiseLoudness = 1.0f; // 20m guard hearing radius
+        [SerializeField] private float noiseLoudness = 0.30f; // Softened noise: ~7m guard hearing radius
+
+        [Header("Passive Footstep Micro-Sonar (Accessibility)")]
+        [SerializeField] private bool enablePassiveSonar = true;
+        [SerializeField] private float passiveSonarInterval = 1.3f;
+        [SerializeField] private float passiveSonarRange = 9.5f;
+        [SerializeField] private int passiveSonarRays = 36;
 
         private float _currentBattery;
         private float _lastPulseTime = -99f;
         private bool _isPulseActive = false;
+        private float _passiveSonarTimer = 0f;
+        private Vector3 _lastPosition;
 
         public float CurrentBattery => _currentBattery;
         public float MaxBattery => maxBattery;
@@ -52,6 +60,30 @@ namespace NightWarden.SLAM
         {
             _currentBattery = maxBattery;
             if (audioSource == null) audioSource = GetComponent<AudioSource>();
+            _lastPosition = transform.position;
+
+            if (pulseSound == null)
+            {
+                pulseSound = CreateChirpClip("EchoPulseRadar", 0.32f, 820f, 240f);
+            }
+        }
+
+        private AudioClip CreateChirpClip(string clipName, float duration, float startFreq, float endFreq)
+        {
+            int sampleRate = 44100;
+            int count = Mathf.FloorToInt(sampleRate * duration);
+            float[] samples = new float[count];
+            for (int i = 0; i < count; i++)
+            {
+                float t = (float)i / sampleRate;
+                float p = t / duration;
+                float freq = Mathf.Lerp(startFreq, endFreq, p * p);
+                float envelope = Mathf.Sin(p * Mathf.PI);
+                samples[i] = Mathf.Sin(2f * Mathf.PI * freq * t) * envelope * 0.42f;
+            }
+            AudioClip clip = AudioClip.Create(clipName, count, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
 
         private void Update()
@@ -66,6 +98,42 @@ namespace NightWarden.SLAM
             if (_currentBattery < maxBattery)
             {
                 _currentBattery = Mathf.Min(maxBattery, _currentBattery + batteryRechargeRate * Time.deltaTime);
+            }
+
+            // Passive silent micro-sonar while moving
+            if (enablePassiveSonar)
+            {
+                _passiveSonarTimer -= Time.deltaTime;
+                float distMoved = Vector3.Distance(transform.position, _lastPosition);
+                _lastPosition = transform.position;
+
+                if (_passiveSonarTimer <= 0f && (distMoved > 0.04f || Input.anyKey))
+                {
+                    _passiveSonarTimer = passiveSonarInterval;
+                    TriggerPassiveMicroSonar();
+                }
+            }
+        }
+
+        private void TriggerPassiveMicroSonar()
+        {
+            Vector3 origin = transform.position + Vector3.up * 0.8f;
+            float angleStep = 360f / passiveSonarRays;
+
+            for (int i = 0; i < passiveSonarRays; i++)
+            {
+                float rad = i * angleStep * Mathf.Deg2Rad;
+                Vector3 dir = new Vector3(Mathf.Cos(rad), -0.15f, Mathf.Sin(rad)).normalized;
+
+                if (Physics.Raycast(origin, dir, out RaycastHit hit, passiveSonarRange, hitLayers, QueryTriggerInteraction.Ignore))
+                {
+                    Color pointColor = environmentColor;
+                    if (hit.collider.CompareTag("Bomb")) pointColor = bombColor;
+                    else if (hit.collider.CompareTag("Guard")) pointColor = guardColor;
+                    else if (hit.collider.CompareTag("Ledge") || hit.collider.CompareTag("Climbable")) pointColor = ledgeColor;
+
+                    PointCloudBuffer.Instance?.AddPoint(hit.point, pointColor);
+                }
             }
         }
 

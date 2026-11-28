@@ -25,13 +25,16 @@ namespace NightWarden.UI
         private Camera _mainCamera;
         private Transform _playerTransform;
         private List<BombObjective> _bombs = new List<BombObjective>();
+        private List<NightWarden.AI.GuardAI> _guards = new List<NightWarden.AI.GuardAI>();
         private ExtractionPoint _extraction;
         private float _bannerTimer = 0f;
+        private float _smokeAlertTimer = 0f;
         private GUIStyle _markerStyle;
         private GUIStyle _bgStyle;
         private GUIStyle _bannerStyle;
         private GUIStyle _defusePromptStyle;
-        private GUIStyle _defuseProgressStyle;
+        private GUIStyle _smokeStyle;
+        private GUIStyle _hintStyle;
         private Texture2D _bgTexture;
         private Texture2D _progressFgTexture;
         private Texture2D _progressBgTexture;
@@ -45,11 +48,29 @@ namespace NightWarden.UI
             RefreshObjectives();
             _bannerTimer = bannerDuration;
             InitStyles();
+
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnSmokePelletUsed += HandleSmokePelletUsed;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnSmokePelletUsed -= HandleSmokePelletUsed;
+            }
+        }
+
+        private void HandleSmokePelletUsed(int remaining)
+        {
+            _smokeAlertTimer = 4.5f;
         }
 
         private void InitStyles()
         {
-            _bgTexture = MakeSolidTexture(2, 2, new Color(0.04f, 0.07f, 0.12f, 0.82f));
+            _bgTexture = MakeSolidTexture(2, 2, new Color(0.04f, 0.07f, 0.12f, 0.85f));
             _progressBgTexture = MakeSolidTexture(2, 2, new Color(0.1f, 0.15f, 0.22f, 0.88f));
             _progressFgTexture = MakeSolidTexture(2, 2, new Color(1.0f, 0.85f, 0.15f, 0.95f));
 
@@ -69,10 +90,27 @@ namespace NightWarden.UI
 
             _bannerStyle = new GUIStyle
             {
-                fontSize = 17,
+                fontSize = 16,
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
                 normal = { textColor = new Color(0.85f, 0.95f, 1.0f, 1.0f), background = _bgTexture }
+            };
+
+            _smokeStyle = new GUIStyle
+            {
+                fontSize = 16,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                normal = { textColor = new Color(0.3f, 1.0f, 0.7f, 1.0f), background = _bgTexture }
+            };
+
+            _hintStyle = new GUIStyle
+            {
+                fontSize = 12,
+                fontStyle = FontStyle.Normal,
+                alignment = TextAnchor.UpperLeft,
+                normal = { textColor = new Color(0.75f, 0.88f, 0.98f, 0.9f), background = _bgTexture },
+                padding = new RectOffset(10, 10, 8, 8)
             };
 
             _defusePromptStyle = new GUIStyle
@@ -98,6 +136,8 @@ namespace NightWarden.UI
         {
             _bombs.Clear();
             _bombs.AddRange(FindObjectsByType<BombObjective>(FindObjectsSortMode.None));
+            _guards.Clear();
+            _guards.AddRange(FindObjectsByType<NightWarden.AI.GuardAI>(FindObjectsSortMode.None));
             _extraction = FindFirstObjectByType<ExtractionPoint>(FindObjectsInactive.Include);
         }
 
@@ -110,10 +150,8 @@ namespace NightWarden.UI
                 if (player != null) _playerTransform = player.transform;
             }
 
-            if (_bannerTimer > 0f)
-            {
-                _bannerTimer -= Time.deltaTime;
-            }
+            if (_bannerTimer > 0f) _bannerTimer -= Time.deltaTime;
+            if (_smokeAlertTimer > 0f) _smokeAlertTimer -= Time.deltaTime;
         }
 
         private void OnGUI()
@@ -122,6 +160,8 @@ namespace NightWarden.UI
             if (GameManager.Instance != null && GameManager.Instance.CurrentState != GameState.Playing) return;
 
             DrawMissionBanner();
+            DrawSmokeAlertBanner();
+            DrawTacticalHUDInfo();
             DrawObjectiveWaypoints();
             DrawDefusalInteractionPrompt();
         }
@@ -139,6 +179,67 @@ namespace NightWarden.UI
                 float height = 44f;
                 Rect rect = new Rect((Screen.width - width) * 0.5f, 75f, width, height);
                 GUI.Box(rect, "MISSION: Track down & defuse 3 explosive devices. Press [Q] to scan.", _bannerStyle);
+            }
+        }
+
+        private void DrawSmokeAlertBanner()
+        {
+            if (_smokeAlertTimer > 0f)
+            {
+                float width = 600f;
+                float height = 46f;
+                Rect rect = new Rect((Screen.width - width) * 0.5f, 125f, width, height);
+                GUI.Box(rect, "💨 SMOKE DEPLOYED! GUARD STUNNED — BREAK LINE OF SIGHT!", _smokeStyle);
+            }
+        }
+
+        private void DrawTacticalHUDInfo()
+        {
+            // Bottom-left Smoke Pellet display
+            if (GameManager.Instance != null)
+            {
+                int pellets = GameManager.Instance.SmokePelletsRemaining;
+                float w = 260f;
+                float h = 32f;
+                Rect smokeRect = new Rect(25f, Screen.height - 45f, w, h);
+                string text = $"💨 SMOKE PELLETS: {pellets}/3 (Auto-Evade)";
+                GUI.Box(smokeRect, text, _smokeStyle);
+            }
+
+            // Top-right subtle controls cheat sheet for non-gamers
+            float panelW = 210f;
+            float panelH = 125f;
+            Rect hintRect = new Rect(Screen.width - panelW - 20f, 20f, panelW, panelH);
+            string controlsText = "CONTROLS GUIDE\n" +
+                                 "• WASD : Move (Auto-Cam)\n" +
+                                 "• Shift : Sprint\n" +
+                                 "• C : Crouch (Stealth)\n" +
+                                 "• Q : Sonar LiDAR Pulse\n" +
+                                 "• E : Defuse Bomb (Hold)\n" +
+                                 "• F : Silent Takedown";
+            GUI.Box(hintRect, controlsText, _hintStyle);
+
+            // Guard Awareness Warning if close guard is detecting player
+            float maxGuardDetection = 0f;
+            foreach (var guard in _guards)
+            {
+                if (guard != null && !guard.IsEliminated && guard.DetectionProgress > maxGuardDetection)
+                {
+                    maxGuardDetection = guard.DetectionProgress;
+                }
+            }
+
+            if (maxGuardDetection > 0.15f)
+            {
+                float w = 480f;
+                float h = 36f;
+                Rect detectRect = new Rect((Screen.width - w) * 0.5f, 32f, w, h);
+                Color oldCol = _markerStyle.normal.textColor;
+                _markerStyle.normal.textColor = Color.Lerp(Color.yellow, Color.red, maxGuardDetection);
+                GUI.Box(detectRect, GUIContent.none, _bgStyle);
+                string alertMsg = maxGuardDetection >= 0.9f ? "🚨 GUARD SPOTTED YOU! PREPARE TO EVADE!" : $"⚠️ GUARD SUSPICIOUS ({Mathf.FloorToInt(maxGuardDetection * 100)}%) — CROUCH [C]!";
+                GUI.Label(detectRect, alertMsg, _markerStyle);
+                _markerStyle.normal.textColor = oldCol;
             }
         }
 

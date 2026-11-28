@@ -35,6 +35,7 @@ namespace NightWarden.Player
         private bool _isCrouching = false;
         private float _stepTimer = 0f;
 
+        public static ThirdPersonPlayerController Instance { get; private set; }
         public bool IsCrouching => _isCrouching;
         public bool IsSprinting { get; private set; }
         public float CurrentSpeed { get; private set; }
@@ -42,6 +43,7 @@ namespace NightWarden.Player
 
         private void Awake()
         {
+            Instance = this;
             _controller = GetComponent<CharacterController>();
             if (cameraTransform == null && Camera.main != null)
             {

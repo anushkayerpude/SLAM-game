@@ -34,20 +34,39 @@ The game models real-world robotics and spatial perception principles directly i
 
 ---
 
-## 3. Controls
+## 3. Controls & Non-Gamer Accessibility Suite
 
-| Action | Primary Input (Unified Input System) |
-| :--- | :--- |
-| **Move** | `W`, `A`, `S`, `D` / Arrow Keys |
-| **Look / Orbit Camera** | Mouse Delta |
-| **Sprint** | `Left Shift` (generates 8m noise radius) |
-| **Crouch** | `C` or `Left Ctrl` (reduces noise to ~1.5m; enables stealth) |
-| **Jump** | `Space` |
-| **Echo Pulse** | `Q` (360° LiDAR sweep, creates 20m acoustic disturbance) |
-| **Silent Takedown** | `F` (when crouched directly behind an unaware guard) |
-| **Defuse Bomb** | Hold `E` for 3.0 continuous seconds within 2.4m range |
-| **Toggle MiniMap** | `Tab` or `M` |
-| **Pause / Resume** | `Escape` |
+| Action | Primary Input (Unified Input System) | Accessibility Behavior |
+| :--- | :--- | :--- |
+| **Move** | `W`, `A`, `S`, `D` / Arrow Keys | **Smart Auto-Follow Camera**: When moving without mouse input, the camera automatically glides behind the player heading. Non-gamers don't have to fight two-handed mouse+keyboard coordination! |
+| **Look / Orbit Camera** | Mouse Delta | Optional manual camera control; smoothly yields back to auto-follow when released. |
+| **Sprint** | `Left Shift` | Speed boosts to `6.4m/s` (faster than guards' `3.8m/s` chase speed). |
+| **Crouch** | `C` or `Left Ctrl` | Drops player height to `0.9m`; slows guard detection buildup by **55%**. |
+| **Jump** | `Space` | Vault onto curbs, crates, and containers. |
+| **Echo Pulse** | `Q` | 360° LiDAR sweep (32m range, softened acoustic noise radius of ~7m). |
+| **Passive Sonar** | Automatic (Walking) | **Silent Micro-Sonar**: 36 rays automatically map immediate curbs and walls (9.5m) every 1.3s with zero noise emitted! |
+| **Defuse Bomb** | Hold `E` for 3.0s | In-world HUD displays progress bar and distance markers. |
+| **Smoke Pellets** | Automatic (On Contact) | **Second Chances**: 3 charges that automatically deploy when a guard reaches you, stunning them for 4.5s and knocking them back. |
+| **Silent Takedown** | `F` | Incapacitates an unaware guard from behind. |
+| **Toggle MiniMap** | `Tab` or `M` | Top-down SLAM radar. |
+| **Pause / Resume** | `Escape` | Toggles pause overlay and unlocks cursor. |
+
+---
+
+## 4. Accessibility & Quality-of-Life Enhancements
+
+1. **In-World Tactical Waypoints**:
+   - High-visibility tactical markers (`◆ BOMB #1 [Xm]`) clamp to screen edges so players never get lost in the dark.
+   - When all 3 bombs are defused, a glowing green `★ EXTRACTION POINT` beacon immediately illuminates the escape route.
+2. **Detection Grace Period & Dynamic Flashlights**:
+   - Guards no longer trigger instant game over when glancing at the player.
+   - A 2.8s grace period allows the player to duck behind cover or crouch (`C`). Guard flashlights shift color from warm yellow $\rightarrow$ alerting orange $\rightarrow$ red to give clear visual warning.
+3. **Escapable Chase Speed**:
+   - Guard chase speed has been rebalanced to `3.8m/s` (player walks at `3.6m/s` and sprints at `6.4m/s`). Simply sprinting away easily breaks line of sight.
+4. **Relaxed Mission Timer**:
+   - The global timer is set to a generous **10:00 minutes** (with an optional untimed `detectiveMode` toggle).
+5. **Procedural Audio Engine**:
+   - In-game audio (LiDAR sonar chirp, 3-note defusal success chord, guard alert tones, and smoke whoosh) is synthesized procedurally in C# via `AudioClip.Create` — zero external asset dependencies required.
 
 ---
 

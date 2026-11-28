@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using NightWarden.Stealth;
 using NightWarden.Core;
+using NightWarden.Player;
 
 namespace NightWarden.AI
 {
@@ -30,21 +31,24 @@ namespace NightWarden.AI
         [SerializeField] private float waitTimeAtWaypoint = 3.0f;
 
         [Header("Investigation & Chase")]
-        [SerializeField] private float investigateSpeed = 3.8f;
-        [SerializeField] private float chaseSpeed = 5.6f;
-        [SerializeField] private float searchDuration = 6.0f;
-        [SerializeField] private float hearingThreshold = 0.15f;
+        [SerializeField] private float investigateSpeed = 3.2f;
+        [SerializeField] private float chaseSpeed = 3.8f; // Non-gamer friendly (player walks 3.6f, sprints 6.4f)
+        [SerializeField] private float searchDuration = 5.0f;
+        [SerializeField] private float hearingThreshold = 0.20f;
         [SerializeField] private float attackRange = 1.6f;
 
-        [Header("Vision Detection")]
+        [Header("Vision & Detection Grace Period")]
         [SerializeField] private float visionRange = 12f;
         [SerializeField] private float visionFov = 75f;
         [SerializeField] private LayerMask visionObstacleLayers = ~0;
+        [SerializeField] private float detectionTimeToChase = 2.8f; // 2.8s grace period before chase initiates
+        [SerializeField] private float stunDuration = 4.5f;
 
         [Header("Audio")]
         [SerializeField] private AudioSource audioSource;
         [SerializeField] private AudioClip alertSound;
         [SerializeField] private AudioClip takedownSound;
+        [SerializeField] private AudioClip stunSound;
 
         private NavMeshAgent _agent;
         private Transform _playerTransform;
@@ -54,9 +58,15 @@ namespace NightWarden.AI
         private float _searchTimer = 0f;
         private bool _isWaiting = false;
         private bool _isEliminated = false;
+        private bool _isStunned = false;
+        private float _stunTimer = 0f;
+        private float _detectionProgress = 0f;
+        private Light _flashlight;
 
         public GuardState CurrentState => currentState;
         public bool IsEliminated => _isEliminated;
+        public bool IsStunned => _isStunned;
+        public float DetectionProgress => _detectionProgress;
 
         private void Awake()
         {
@@ -67,6 +77,35 @@ namespace NightWarden.AI
             var player = GameObject.FindWithTag("Player");
             if (player != null) _playerTransform = player.transform;
             if (audioSource == null) audioSource = GetComponent<AudioSource>();
+
+            _flashlight = GetComponentInChildren<Light>();
+
+            InitProceduralAudio();
+        }
+
+        private void InitProceduralAudio()
+        {
+            if (alertSound == null) alertSound = CreateToneClip("GuardAlert", 0.35f, 320f, 680f, 0.45f);
+            if (takedownSound == null) takedownSound = CreateToneClip("GuardTakedown", 0.4f, 180f, 90f, 0.5f);
+            if (stunSound == null) stunSound = CreateToneClip("GuardStun", 0.6f, 500f, 120f, 0.4f);
+        }
+
+        private AudioClip CreateToneClip(string name, float duration, float startFreq, float endFreq, float volume)
+        {
+            int sampleRate = 44100;
+            int count = Mathf.FloorToInt(sampleRate * duration);
+            float[] samples = new float[count];
+            for (int i = 0; i < count; i++)
+            {
+                float t = (float)i / sampleRate;
+                float p = t / duration;
+                float freq = Mathf.Lerp(startFreq, endFreq, p);
+                float envelope = Mathf.Sin(p * Mathf.PI);
+                samples[i] = Mathf.Sin(2f * Mathf.PI * freq * t) * envelope * volume;
+            }
+            AudioClip clip = AudioClip.Create(name, count, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
 
         private void OnEnable()
@@ -106,16 +145,57 @@ namespace NightWarden.AI
                 return;
             }
 
+            // Handle Stun state
+            if (_isStunned)
+            {
+                _stunTimer -= Time.deltaTime;
+                _agent.isStopped = true;
+                if (_flashlight != null)
+                {
+                    _flashlight.intensity = (Mathf.PingPong(Time.time * 8f, 1f) > 0.5f) ? 0.3f : 1.2f;
+                    _flashlight.color = new Color(0.4f, 0.6f, 1.0f); // Cold electric blue during stun
+                }
+
+                if (_stunTimer <= 0f)
+                {
+                    _isStunned = false;
+                    _detectionProgress = 0f;
+                    _agent.isStopped = false;
+                    if (_flashlight != null)
+                    {
+                        _flashlight.intensity = 2.4f;
+                        _flashlight.color = new Color(1f, 0.85f, 0.4f);
+                    }
+                    TransitionTo(GuardState.Search);
+                }
+                return;
+            }
+
             _agent.isStopped = false;
 
-            // Continual vision check
-            if (CanSeePlayer())
+            // Continual vision & gradual detection check
+            bool seesPlayer = CanSeePlayer();
+            if (seesPlayer)
             {
-                if (currentState != GuardState.Chase)
+                bool isCrouched = ThirdPersonPlayerController.Instance != null && ThirdPersonPlayerController.Instance.IsCrouching;
+                float rate = isCrouched ? 0.45f : 1.0f; // 55% slower detection when crouched
+                _detectionProgress = Mathf.Clamp01(_detectionProgress + (rate * Time.deltaTime / detectionTimeToChase));
+
+                if (_detectionProgress >= 1.0f && currentState != GuardState.Chase)
                 {
                     TransitionTo(GuardState.Chase);
                 }
             }
+            else
+            {
+                if (currentState != GuardState.Chase)
+                {
+                    _detectionProgress = Mathf.Max(0f, _detectionProgress - Time.deltaTime * 0.5f);
+                }
+            }
+
+            // Update Flashlight color based on awareness state
+            UpdateFlashlightColor();
 
             switch (currentState)
             {
@@ -138,8 +218,75 @@ namespace NightWarden.AI
             {
                 if (Vector3.Distance(transform.position, _playerTransform.position) <= attackRange)
                 {
-                    GameManager.Instance?.TriggerGameOver("You were apprehended by an armed guard.");
+                    // Second chance check: Smoke Pellet
+                    if (GameManager.Instance != null && GameManager.Instance.TryDeploySmokePellet())
+                    {
+                        StunGuard(stunDuration);
+                        // Knockback guard away from player
+                        Vector3 pushDir = (transform.position - _playerTransform.position);
+                        pushDir.y = 0;
+                        if (pushDir.sqrMagnitude < 0.01f) pushDir = -transform.forward;
+                        Vector3 knockback = transform.position + pushDir.normalized * 3.2f;
+                        if (NavMesh.SamplePosition(knockback, out NavMeshHit hit, 4.0f, NavMesh.AllAreas))
+                        {
+                            transform.position = hit.position;
+                        }
+                    }
+                    else
+                    {
+                        GameManager.Instance?.TriggerGameOver("You were apprehended by an armed guard.");
+                    }
                 }
+            }
+        }
+
+        private void UpdateFlashlightColor()
+        {
+            if (_flashlight == null) return;
+
+            if (currentState == GuardState.Chase)
+            {
+                _flashlight.color = new Color(1.0f, 0.15f, 0.15f); // Red
+                _flashlight.intensity = 2.8f;
+            }
+            else if (currentState == GuardState.Investigate)
+            {
+                _flashlight.color = new Color(1.0f, 0.6f, 0.1f); // Orange
+                _flashlight.intensity = 2.5f;
+            }
+            else
+            {
+                if (_detectionProgress > 0.05f)
+                {
+                    // Smoothly transition from yellow to red as detection fills
+                    _flashlight.color = Color.Lerp(new Color(1f, 0.85f, 0.35f), new Color(1.0f, 0.15f, 0.15f), _detectionProgress);
+                    _flashlight.intensity = 2.4f + _detectionProgress * 0.6f;
+                }
+                else
+                {
+                    _flashlight.color = new Color(1f, 0.88f, 0.45f); // Soft warm ambient yellow
+                    _flashlight.intensity = 2.4f;
+                }
+            }
+        }
+
+        public void StunGuard(float duration)
+        {
+            if (_isEliminated) return;
+
+            _isStunned = true;
+            _stunTimer = duration;
+            _detectionProgress = 0f;
+
+            if (_agent != null && _agent.isOnNavMesh)
+            {
+                _agent.isStopped = true;
+                _agent.velocity = Vector3.zero;
+            }
+
+            if (audioSource != null && stunSound != null)
+            {
+                audioSource.PlayOneShot(stunSound);
             }
         }
 
