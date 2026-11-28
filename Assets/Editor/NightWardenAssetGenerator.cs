@@ -9,6 +9,7 @@ using NightWarden.Player;
 using NightWarden.SLAM;
 using NightWarden.UI;
 using NightWarden.Audio;
+using NightWarden.AI;
 
 namespace NightWarden.EditorTools
 {
@@ -203,12 +204,12 @@ namespace NightWarden.EditorTools
                 }
             });
 
-            // 3. Utility Belt & Buckles (Dark Gunmetal, Smoothness 0.65, Metallic 0.75)
+            // 3. Utility Belt & Buckles (Classic Tactical Gold/Bronze, Smoothness 0.75, Metallic 0.85)
             SaveMaterial("Mat_UtilityBeltBuckles.mat", litShader, mat =>
             {
-                mat.SetColor("_BaseColor", new Color(0.13f, 0.15f, 0.18f, 1.0f));
-                mat.SetFloat("_Smoothness", 0.65f);
-                mat.SetFloat("_Metallic", 0.75f);
+                mat.SetColor("_BaseColor", new Color(0.42f, 0.35f, 0.18f, 1.0f)); // Tactical gold/brass
+                mat.SetFloat("_Smoothness", 0.75f);
+                mat.SetFloat("_Metallic", 0.85f);
             });
 
             // 4. Cowl Eye Lenses (Emissive Angular White Glow)
@@ -491,6 +492,28 @@ namespace NightWarden.EditorTools
                 GameObject chestPlate = CreateVisualChild("Armor_ChestPlate", torso.transform, PrimitiveType.Cube,
                     new Vector3(0f, 0.12f, 0.14f), new Vector3(0.46f, 0.32f, 0.08f), matArmor);
 
+                // --- Armored Bat Emblem (Layered across Pectoral Armor) ---
+                GameObject batEmblem = CreateVisualChild("Armor_BatEmblem_Center", chestPlate.transform, PrimitiveType.Cube,
+                    new Vector3(0f, 0.03f, 0.055f), new Vector3(0.09f, 0.16f, 0.03f), matArmor);
+                CreateVisualChild("Bat_Emblem_Ears", batEmblem.transform, PrimitiveType.Cube,
+                    new Vector3(0f, 0.58f, 0f), new Vector3(0.55f, 0.35f, 0.55f), matArmor);
+
+                GameObject wingL1 = CreateVisualChild("Bat_Wing_L1", batEmblem.transform, PrimitiveType.Cube,
+                    new Vector3(-1.4f, 0.12f, 0f), new Vector3(1.8f, 0.65f, 0.8f), matArmor);
+                wingL1.transform.localRotation = Quaternion.Euler(0f, 0f, 16f);
+
+                GameObject wingL2 = CreateVisualChild("Bat_Wing_L2", batEmblem.transform, PrimitiveType.Cube,
+                    new Vector3(-2.6f, 0.35f, 0f), new Vector3(1.5f, 0.45f, 0.7f), matArmor);
+                wingL2.transform.localRotation = Quaternion.Euler(0f, 0f, 32f);
+
+                GameObject wingR1 = CreateVisualChild("Bat_Wing_R1", batEmblem.transform, PrimitiveType.Cube,
+                    new Vector3(1.4f, 0.12f, 0f), new Vector3(1.8f, 0.65f, 0.8f), matArmor);
+                wingR1.transform.localRotation = Quaternion.Euler(0f, 0f, -16f);
+
+                GameObject wingR2 = CreateVisualChild("Bat_Wing_R2", batEmblem.transform, PrimitiveType.Cube,
+                    new Vector3(2.6f, 0.35f, 0f), new Vector3(1.5f, 0.45f, 0.7f), matArmor);
+                wingR2.transform.localRotation = Quaternion.Euler(0f, 0f, -32f);
+
                 GameObject abPlate1 = CreateVisualChild("Armor_AbPlate_Upper", torso.transform, PrimitiveType.Cube,
                     new Vector3(0f, -0.10f, 0.13f), new Vector3(0.38f, 0.10f, 0.07f), matArmor);
 
@@ -522,7 +545,13 @@ namespace NightWarden.EditorTools
                 CreateVisualChild("Pouch_SideL", belt.transform, PrimitiveType.Cube, new Vector3(-0.25f, 0f, 0f), new Vector3(0.06f, 0.11f, 0.10f), matArmor);
                 CreateVisualChild("Pouch_SideR", belt.transform, PrimitiveType.Cube, new Vector3(0.25f, 0f, 0f), new Vector3(0.06f, 0.11f, 0.10f), matArmor);
 
-                // --- Arms & Bracers ---
+                // Cylindrical Smoke Canisters on Rear/Side of Belt
+                CreateVisualChild("Belt_Canister_L", belt.transform, PrimitiveType.Cylinder,
+                    new Vector3(-0.18f, -0.01f, -0.14f), new Vector3(0.055f, 0.07f, 0.055f), matBuckles);
+                CreateVisualChild("Belt_Canister_R", belt.transform, PrimitiveType.Cylinder,
+                    new Vector3(0.18f, -0.01f, -0.14f), new Vector3(0.055f, 0.07f, 0.055f), matBuckles);
+
+                // --- Arms & Bracers with 3 Serrated Bat Blade Fins ---
                 GameObject armL = CreateVisualChild("Arm_Upper_L", rigRoot.transform, PrimitiveType.Capsule,
                     new Vector3(-0.35f, 1.20f, 0f), new Vector3(0.14f, 0.24f, 0.14f), matFabric);
                 GameObject forearmL = CreateVisualChild("Forearm_L", rigRoot.transform, PrimitiveType.Capsule,
@@ -530,12 +559,34 @@ namespace NightWarden.EditorTools
                 GameObject bracerL = CreateVisualChild("Bracer_Armor_L", forearmL.transform, PrimitiveType.Cube,
                     new Vector3(-0.06f, 0f, 0f), new Vector3(0.06f, 0.26f, 0.15f), matArmor);
 
+                // 3 Bat Blade Fins on Left Forearm
+                CreateVisualChild("Bat_Fin_L1", bracerL.transform, PrimitiveType.Cube,
+                    new Vector3(-0.06f, 0.08f, -0.06f), new Vector3(0.018f, 0.055f, 0.12f), matArmor)
+                    .transform.localRotation = Quaternion.Euler(-25f, 0f, 0f);
+                CreateVisualChild("Bat_Fin_L2", bracerL.transform, PrimitiveType.Cube,
+                    new Vector3(-0.06f, 0.0f, -0.06f), new Vector3(0.018f, 0.055f, 0.14f), matArmor)
+                    .transform.localRotation = Quaternion.Euler(-25f, 0f, 0f);
+                CreateVisualChild("Bat_Fin_L3", bracerL.transform, PrimitiveType.Cube,
+                    new Vector3(-0.06f, -0.08f, -0.06f), new Vector3(0.018f, 0.055f, 0.12f), matArmor)
+                    .transform.localRotation = Quaternion.Euler(-25f, 0f, 0f);
+
                 GameObject armR = CreateVisualChild("Arm_Upper_R", rigRoot.transform, PrimitiveType.Capsule,
                     new Vector3(0.35f, 1.20f, 0f), new Vector3(0.14f, 0.24f, 0.14f), matFabric);
                 GameObject forearmR = CreateVisualChild("Forearm_R", rigRoot.transform, PrimitiveType.Capsule,
                     new Vector3(0.35f, 0.88f, 0.04f), new Vector3(0.13f, 0.22f, 0.13f), matFabric);
                 GameObject bracerR = CreateVisualChild("Bracer_Armor_R", forearmR.transform, PrimitiveType.Cube,
                     new Vector3(0.06f, 0f, 0f), new Vector3(0.06f, 0.26f, 0.15f), matArmor);
+
+                // 3 Bat Blade Fins on Right Forearm
+                CreateVisualChild("Bat_Fin_R1", bracerR.transform, PrimitiveType.Cube,
+                    new Vector3(0.06f, 0.08f, -0.06f), new Vector3(0.018f, 0.055f, 0.12f), matArmor)
+                    .transform.localRotation = Quaternion.Euler(-25f, 0f, 0f);
+                CreateVisualChild("Bat_Fin_R2", bracerR.transform, PrimitiveType.Cube,
+                    new Vector3(0.06f, 0.0f, -0.06f), new Vector3(0.018f, 0.055f, 0.14f), matArmor)
+                    .transform.localRotation = Quaternion.Euler(-25f, 0f, 0f);
+                CreateVisualChild("Bat_Fin_R3", bracerR.transform, PrimitiveType.Cube,
+                    new Vector3(0.06f, -0.08f, -0.06f), new Vector3(0.018f, 0.055f, 0.12f), matArmor)
+                    .transform.localRotation = Quaternion.Euler(-25f, 0f, 0f);
 
                 // Tactical Gloves
                 CreateVisualChild("Glove_L", forearmL.transform, PrimitiveType.Cube, new Vector3(0f, -0.22f, 0f), new Vector3(0.11f, 0.13f, 0.09f), matArmor);
@@ -556,18 +607,22 @@ namespace NightWarden.EditorTools
                 CreateVisualChild("KneeGuard_R", calfR.transform, PrimitiveType.Cube, new Vector3(0f, 0.12f, 0.08f), new Vector3(0.14f, 0.10f, 0.05f), matArmor);
                 CreateVisualChild("CombatBoot_R", calfR.transform, PrimitiveType.Cube, new Vector3(0f, -0.24f, 0.05f), new Vector3(0.15f, 0.14f, 0.26f), matArmor);
 
-                // --- Full Cowl with Sharp Angular Ears & White Eye Lenses ---
+                // --- Full Batman Cowl with Sculpted Brow & Pointed Ears ---
                 GameObject cowlHead = CreateVisualChild("Cowl_Head", rigRoot.transform, PrimitiveType.Cube,
                     new Vector3(0f, 1.62f, 0.02f), new Vector3(0.26f, 0.28f, 0.26f), matArmor);
 
-                // Sleek Sharp Cowl Ears (Prism angular aesthetic)
+                // Sleek Sharp Batman Cowl Ears (Pointed, angled backward)
                 GameObject earL = CreateVisualChild("Cowl_Ear_L", cowlHead.transform, PrimitiveType.Cube,
-                    new Vector3(-0.10f, 0.21f, -0.04f), new Vector3(0.05f, 0.24f, 0.06f), matArmor);
-                earL.transform.localRotation = Quaternion.Euler(8f, 0f, 14f);
+                    new Vector3(-0.09f, 0.24f, -0.04f), new Vector3(0.042f, 0.28f, 0.048f), matArmor);
+                earL.transform.localRotation = Quaternion.Euler(14f, -4f, 16f);
 
                 GameObject earR = CreateVisualChild("Cowl_Ear_R", cowlHead.transform, PrimitiveType.Cube,
-                    new Vector3(0.10f, 0.21f, -0.04f), new Vector3(0.05f, 0.24f, 0.06f), matArmor);
-                earR.transform.localRotation = Quaternion.Euler(8f, 0f, -14f);
+                    new Vector3(0.09f, 0.24f, -0.04f), new Vector3(0.042f, 0.28f, 0.048f), matArmor);
+                earR.transform.localRotation = Quaternion.Euler(14f, 4f, -16f);
+
+                // Nose Bridge & Brow Guard
+                CreateVisualChild("Cowl_NoseBridge", cowlHead.transform, PrimitiveType.Cube,
+                    new Vector3(0f, 0.02f, 0.145f), new Vector3(0.045f, 0.09f, 0.035f), matArmor);
 
                 // Jaw / Chin Guard
                 CreateVisualChild("Cowl_ChinGuard", cowlHead.transform, PrimitiveType.Cube,
@@ -632,29 +687,16 @@ namespace NightWarden.EditorTools
                 }
             }
 
-            // 9. Guard Patrol Flashlights (Makes stealth readable, guards visible & fair)
+            // 9. Transform Security Guards into Eerie Spectral Ghosts with Phantom Light & Ectoplasm
             GameObject guardsParent = GameObject.Find("--- ARMED_GUARDS ---");
             if (guardsParent != null)
             {
                 foreach (Transform guard in guardsParent.transform)
                 {
                     if (!guard.name.Contains("Guard")) continue;
-                    Transform oldFlashlight = guard.Find("Guard_Flashlight");
-                    if (oldFlashlight != null) Object.DestroyImmediate(oldFlashlight.gameObject);
 
-                    GameObject flashObj = new GameObject("Guard_Flashlight");
-                    flashObj.transform.SetParent(guard, false);
-                    flashObj.transform.localPosition = new Vector3(0f, 1.3f, 0.35f);
-                    flashObj.transform.localRotation = Quaternion.Euler(6f, 0f, 0f);
-
-                    var fl = flashObj.AddComponent<Light>();
-                    fl.type = LightType.Spot;
-                    fl.color = new Color(1.0f, 0.94f, 0.75f); // Warm tungsten guard flashlight
-                    fl.intensity = 1.4f;
-                    fl.range = 14f;
-                    fl.spotAngle = 50f;
-                    fl.innerSpotAngle = 24f;
-                    fl.shadows = LightShadows.Soft;
+                    var gVis = guard.GetComponent<GhostVisuals>();
+                    if (gVis == null) guard.gameObject.AddComponent<GhostVisuals>();
                 }
             }
 
@@ -714,6 +756,21 @@ namespace NightWarden.EditorTools
 
                 segments.Add(segObj.transform);
                 currentParent = segObj.transform;
+            }
+
+            // Add 5 Scalloped Bat-Wing Points at Cape Hem
+            Transform lastSeg = segments[segments.Count - 1];
+            float[] batPointX = new float[] { -0.34f, -0.17f, 0f, 0.17f, 0.34f };
+            for (int p = 0; p < batPointX.Length; p++)
+            {
+                GameObject point = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                point.name = $"Bat_CapePoint_{p}";
+                point.transform.SetParent(lastSeg, false);
+                point.transform.localPosition = new Vector3(batPointX[p], -segmentLengths[3] - 0.04f, 0f);
+                point.transform.localRotation = Quaternion.Euler(0f, 0f, (p % 2 == 0) ? 22f : -22f);
+                point.transform.localScale = new Vector3(0.08f, 0.10f, 0.015f);
+                Object.DestroyImmediate(point.GetComponent<Collider>());
+                point.GetComponent<MeshRenderer>().sharedMaterial = capeMat;
             }
 
             sway.SetCapeSegments(segments);

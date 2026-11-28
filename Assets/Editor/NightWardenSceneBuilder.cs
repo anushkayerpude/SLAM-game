@@ -61,6 +61,14 @@ namespace NightWarden.EditorTools
             // Main Ground Street (100x100m)
             CreateStaticBox("Street_Ground", envParent.transform, new Vector3(0, -0.5f, 0), new Vector3(100, 1, 100), asphaltMat);
 
+            // Perimeter Boundary Invisible Walls (Prevents player from falling off into the void)
+            GameObject boundaries = new GameObject("District_Perimeter_Boundaries");
+            boundaries.transform.SetParent(envParent.transform);
+            CreateInvisibleBoundary("Boundary_North", boundaries.transform, new Vector3(0f, 5f, 50f), new Vector3(100f, 10f, 1f));
+            CreateInvisibleBoundary("Boundary_South", boundaries.transform, new Vector3(0f, 5f, -50f), new Vector3(100f, 10f, 1f));
+            CreateInvisibleBoundary("Boundary_East", boundaries.transform, new Vector3(50f, 5f, 0f), new Vector3(1f, 10f, 100f));
+            CreateInvisibleBoundary("Boundary_West", boundaries.transform, new Vector3(-50f, 5f, 0f), new Vector3(1f, 10f, 100f));
+
             // Warehouse Structure (Open Industrial Depot with accessible doorways on all 4 sides)
             GameObject warehouse = new GameObject("Warehouse_Building");
             warehouse.transform.SetParent(envParent.transform);
@@ -252,6 +260,21 @@ namespace NightWarden.EditorTools
             obj.transform.localScale = scale;
             if (mat != null) obj.GetComponent<MeshRenderer>().sharedMaterial = mat;
             GameObjectUtility.SetStaticEditorFlags(obj, StaticEditorFlags.NavigationStatic | StaticEditorFlags.ContributeGI);
+            return obj;
+        }
+
+        private static GameObject CreateInvisibleBoundary(string name, Transform parent, Vector3 pos, Vector3 scale)
+        {
+            GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            obj.name = name;
+            obj.transform.SetParent(parent);
+            obj.transform.position = pos;
+            obj.transform.localScale = scale;
+            var mr = obj.GetComponent<MeshRenderer>();
+            if (mr != null) Object.DestroyImmediate(mr);
+            var mf = obj.GetComponent<MeshFilter>();
+            if (mf != null) Object.DestroyImmediate(mf);
+            GameObjectUtility.SetStaticEditorFlags(obj, StaticEditorFlags.NavigationStatic);
             return obj;
         }
 

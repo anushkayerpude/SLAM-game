@@ -29,6 +29,10 @@ namespace NightWarden.Player
         [Header("Footsteps & Noise")]
         [SerializeField] private float footstepInterval = 0.45f;
 
+        [Header("Respawn & Fall Safety")]
+        [SerializeField] private Vector3 defaultSpawnPosition = new Vector3(0f, 1.0f, -38f);
+        [SerializeField] private float fallDeathThreshold = -3.5f;
+
         private CharacterController _controller;
         private float _rotationVelocity;
         private Vector3 _velocity;
@@ -36,6 +40,7 @@ namespace NightWarden.Player
         private float _stepTimer = 0f;
 
         public static ThirdPersonPlayerController Instance { get; private set; }
+        public static event System.Action OnPlayerRespawned;
         public bool IsCrouching => _isCrouching;
         public bool IsSprinting { get; private set; }
         public float CurrentSpeed { get; private set; }
@@ -56,8 +61,43 @@ namespace NightWarden.Player
 
         private void Update()
         {
+            HandleFallAndRespawn();
             HandleCrouch();
             HandleMovement();
+        }
+
+        private void HandleFallAndRespawn()
+        {
+            // Automatic safety catch if player drops off the world into the void
+            if (transform.position.y < fallDeathThreshold)
+            {
+                Respawn();
+            }
+
+            // Manual respawn on 'R' key
+            if (Input.GetKeyDown(KeyCode.R))
+            {
+                Respawn();
+            }
+        }
+
+        public void Respawn(Vector3? spawnPosition = null)
+        {
+            Vector3 target = spawnPosition ?? defaultSpawnPosition;
+            if (_controller != null)
+            {
+                _controller.enabled = false;
+                transform.position = target;
+                _velocity = Vector3.zero;
+                _controller.enabled = true;
+            }
+            else
+            {
+                transform.position = target;
+            }
+
+            OnPlayerRespawned?.Invoke();
+            Debug.Log($"<color=#00ff88><b>[Night Warden]</b> Player respawned at {target}!</color>");
         }
 
         private void HandleCrouch()

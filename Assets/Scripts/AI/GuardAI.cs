@@ -88,11 +88,17 @@ namespace NightWarden.AI
                 flObj.transform.localRotation = Quaternion.Euler(10f, 0f, 0f);
                 _flashlight = flObj.AddComponent<Light>();
                 _flashlight.type = LightType.Spot;
-                _flashlight.color = new Color(1f, 0.88f, 0.45f);
+                _flashlight.color = new Color(0.2f, 1.0f, 0.9f); // Ghostly phantom teal
                 _flashlight.intensity = 3.8f;
-                _flashlight.range = 22f;
+                _flashlight.range = 24f;
                 _flashlight.spotAngle = 55f;
                 _flashlight.shadows = LightShadows.Soft;
+            }
+
+            // Ensure Ghost Visuals component is active
+            if (GetComponent<GhostVisuals>() == null)
+            {
+                gameObject.AddComponent<GhostVisuals>();
             }
 
             InitProceduralAudio();
@@ -129,6 +135,11 @@ namespace NightWarden.AI
             {
                 NoiseSystem.Instance.OnNoiseEmitted += HandleNoiseEvent;
             }
+
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnBombProgressChanged += HandleBombProgressChanged;
+            }
         }
 
         private void OnDisable()
@@ -137,6 +148,44 @@ namespace NightWarden.AI
             {
                 NoiseSystem.Instance.OnNoiseEmitted -= HandleNoiseEvent;
             }
+
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnBombProgressChanged -= HandleBombProgressChanged;
+            }
+        }
+
+        private void HandleBombProgressChanged(int defused, int total)
+        {
+            // EMP Acoustic Shockwave: Banishes and stuns pursuing ghosts when a bomb is defused!
+            if (_playerTransform != null)
+            {
+                float dist = Vector3.Distance(transform.position, _playerTransform.position);
+                if (dist <= 55f || currentState == GuardState.Chase || currentState == GuardState.Investigate)
+                {
+                    BanishGhost(7.0f);
+                }
+            }
+        }
+
+        public void BanishGhost(float stunDuration)
+        {
+            StunGuard(stunDuration);
+
+            // Knock back ghost away from player
+            if (_playerTransform != null)
+            {
+                Vector3 away = (transform.position - _playerTransform.position).normalized;
+                away.y = 0;
+                Vector3 knockback = transform.position + away * 6.0f;
+                if (NavMesh.SamplePosition(knockback, out NavMeshHit hit, 7.0f, NavMesh.AllAreas))
+                {
+                    transform.position = hit.position;
+                    if (_agent != null && _agent.isOnNavMesh) _agent.Warp(hit.position);
+                }
+            }
+
+            TransitionTo(GuardState.Patrol);
         }
 
         private void Start()
@@ -387,12 +436,24 @@ namespace NightWarden.AI
 
         private void UpdateChase()
         {
-            if (_playerTransform == null || !_agent.isOnNavMesh) return;
+            if (_playerTransform == null) return;
 
-            _agent.SetDestination(_playerTransform.position);
+            if (_agent != null && _agent.isOnNavMesh)
+            {
+                _agent.SetDestination(_playerTransform.position);
+            }
+            else
+            {
+                // Fallback manual chase if outside navmesh
+                transform.position = Vector3.MoveTowards(transform.position, _playerTransform.position, chaseSpeed * Time.deltaTime);
+                Vector3 lookTarget = new Vector3(_playerTransform.position.x, transform.position.y, _playerTransform.position.z);
+                transform.LookAt(lookTarget);
+            }
+
             _lastKnownPlayerPos = _playerTransform.position;
 
-            if (!CanSeePlayer() && Vector3.Distance(transform.position, _playerTransform.position) > 14f)
+            // Relentless ghost pursuit: Ghosts relentlessly chase player across the district until a bomb is defused!
+            if (Vector3.Distance(transform.position, _playerTransform.position) > 65f)
             {
                 _investigationTarget = _lastKnownPlayerPos;
                 TransitionTo(GuardState.Search);

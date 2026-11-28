@@ -29,11 +29,14 @@ namespace NightWarden.UI
         private ExtractionPoint _extraction;
         private float _bannerTimer = 0f;
         private float _smokeAlertTimer = 0f;
+        private float _empPurgeTimer = 0f;
+        private float _respawnAlertTimer = 0f;
         private GUIStyle _markerStyle;
         private GUIStyle _bgStyle;
         private GUIStyle _bannerStyle;
         private GUIStyle _defusePromptStyle;
         private GUIStyle _smokeStyle;
+        private GUIStyle _empStyle;
         private GUIStyle _hintStyle;
         private Texture2D _bgTexture;
         private Texture2D _progressFgTexture;
@@ -52,7 +55,10 @@ namespace NightWarden.UI
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnSmokePelletUsed += HandleSmokePelletUsed;
+                GameManager.Instance.OnBombProgressChanged += HandleBombProgressChanged;
             }
+
+            NightWarden.Player.ThirdPersonPlayerController.OnPlayerRespawned += HandlePlayerRespawned;
         }
 
         private void OnDestroy()
@@ -60,7 +66,20 @@ namespace NightWarden.UI
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnSmokePelletUsed -= HandleSmokePelletUsed;
+                GameManager.Instance.OnBombProgressChanged -= HandleBombProgressChanged;
             }
+
+            NightWarden.Player.ThirdPersonPlayerController.OnPlayerRespawned -= HandlePlayerRespawned;
+        }
+
+        private void HandleBombProgressChanged(int defused, int total)
+        {
+            _empPurgeTimer = 5.0f;
+        }
+
+        private void HandlePlayerRespawned()
+        {
+            _respawnAlertTimer = 3.5f;
         }
 
         private void HandleSmokePelletUsed(int remaining)
@@ -102,6 +121,14 @@ namespace NightWarden.UI
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
                 normal = { textColor = new Color(0.3f, 1.0f, 0.7f, 1.0f), background = _bgTexture }
+            };
+
+            _empStyle = new GUIStyle
+            {
+                fontSize = 16,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                normal = { textColor = new Color(0.2f, 0.95f, 1.0f, 1.0f), background = _bgTexture }
             };
 
             _hintStyle = new GUIStyle
@@ -152,6 +179,8 @@ namespace NightWarden.UI
 
             if (_bannerTimer > 0f) _bannerTimer -= Time.deltaTime;
             if (_smokeAlertTimer > 0f) _smokeAlertTimer -= Time.deltaTime;
+            if (_empPurgeTimer > 0f) _empPurgeTimer -= Time.deltaTime;
+            if (_respawnAlertTimer > 0f) _respawnAlertTimer -= Time.deltaTime;
         }
 
         private void OnGUI()
@@ -161,6 +190,8 @@ namespace NightWarden.UI
 
             DrawMissionBanner();
             DrawSmokeAlertBanner();
+            DrawEMPAlertBanner();
+            DrawRespawnBanner();
             DrawTacticalHUDInfo();
             DrawObjectiveWaypoints();
             DrawDefusalInteractionPrompt();
@@ -193,6 +224,28 @@ namespace NightWarden.UI
             }
         }
 
+        private void DrawEMPAlertBanner()
+        {
+            if (_empPurgeTimer > 0f)
+            {
+                float width = 640f;
+                float height = 46f;
+                Rect rect = new Rect((Screen.width - width) * 0.5f, 125f, width, height);
+                GUI.Box(rect, "💥 BOMB DEFUSED! EMP PURGE BANISHED ALL PURSUING GHOSTS!", _empStyle);
+            }
+        }
+
+        private void DrawRespawnBanner()
+        {
+            if (_respawnAlertTimer > 0f)
+            {
+                float width = 480f;
+                float height = 40f;
+                Rect rect = new Rect((Screen.width - width) * 0.5f, 175f, width, height);
+                GUI.Box(rect, "✨ RESPAWNED AT SAFE STREET CHECKPOINT", _bannerStyle);
+            }
+        }
+
         private void DrawTacticalHUDInfo()
         {
             // Bottom-left Smoke Pellet display
@@ -207,15 +260,16 @@ namespace NightWarden.UI
             }
 
             // Top-right subtle controls cheat sheet for non-gamers
-            float panelW = 210f;
-            float panelH = 125f;
+            float panelW = 220f;
+            float panelH = 145f;
             Rect hintRect = new Rect(Screen.width - panelW - 20f, 20f, panelW, panelH);
             string controlsText = "CONTROLS GUIDE\n" +
                                  "• WASD : Move (Auto-Cam)\n" +
-                                 "• Shift : Sprint\n" +
+                                 "• Shift : Sprint (Escape Ghosts)\n" +
                                  "• C : Crouch (Stealth)\n" +
                                  "• Q : Sonar LiDAR Pulse\n" +
-                                 "• E : Defuse Bomb (Hold)\n" +
+                                 "• E : Defuse (Banishes Ghosts!)\n" +
+                                 "• R : Respawn Checkpoint\n" +
                                  "• F : Silent Takedown";
             GUI.Box(hintRect, controlsText, _hintStyle);
 
