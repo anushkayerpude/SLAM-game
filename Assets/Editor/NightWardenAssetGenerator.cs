@@ -726,6 +726,81 @@ namespace NightWarden.EditorTools
                 SetLayerRecursively(child.gameObject, layer);
             }
         }
+
+        [MenuItem("Night Warden/Auto-Snap Armor to Mixamo Rig", false, 2)]
+        public static void AutoSnapArmorToMixamoRig()
+        {
+            GameObject playerObj = GameObject.FindWithTag("Player");
+            if (playerObj == null)
+            {
+                Debug.LogError("[Night Warden] No GameObject with tag 'Player' found in scene.");
+                return;
+            }
+
+            Transform rig = playerObj.transform.Find("Vigilante_VisualRig");
+            if (rig == null)
+            {
+                Debug.LogError("[Night Warden] 'Vigilante_VisualRig' not found under Player.");
+                return;
+            }
+
+            // Find all bones recursively under Player
+            Transform FindBone(string namePattern)
+            {
+                foreach (Transform t in playerObj.GetComponentsInChildren<Transform>(true))
+                {
+                    if (t.name.ToLower().Contains(namePattern.ToLower())) return t;
+                }
+                return null;
+            }
+
+            Transform headBone = FindBone("Head");
+            Transform chestBone = FindBone("Spine2") ?? FindBone("Chest") ?? FindBone("Spine1");
+            Transform hipsBone = FindBone("Hips");
+            Transform leftForearm = FindBone("LeftForeArm") ?? FindBone("Forearm.L");
+            Transform rightForearm = FindBone("RightForeArm") ?? FindBone("Forearm.R");
+
+            if (headBone == null && chestBone == null)
+            {
+                Debug.LogWarning("[Night Warden] No Mixamo humanoid skeleton detected under Player. Make sure your imported FBX is placed as a child of 'Player' and its Rig is set to Humanoid.");
+                return;
+            }
+
+            // Snap armor pieces
+            void Snap(string pieceName, Transform targetBone, Vector3 localOffset)
+            {
+                if (targetBone == null) return;
+                Transform piece = null;
+                foreach (Transform t in rig.GetComponentsInChildren<Transform>(true))
+                {
+                    if (t.name == pieceName) { piece = t; break; }
+                }
+                if (piece != null)
+                {
+                    piece.SetParent(targetBone, false);
+                    piece.localPosition = localOffset;
+                    Debug.Log($"[Night Warden] Snapped {pieceName} to {targetBone.name}");
+                }
+            }
+
+            Snap("Cowl_Head", headBone, new Vector3(0f, 0.08f, 0.02f));
+            Snap("Armor_ChestPlate", chestBone, new Vector3(0f, 0.12f, 0.12f));
+            Snap("Vigilante_Cape", chestBone, new Vector3(0f, 0.18f, -0.15f));
+            Snap("UtilityBelt_Strap", hipsBone, new Vector3(0f, 0.05f, 0f));
+            Snap("Bracer_Armor_L", leftForearm, new Vector3(-0.04f, 0.12f, 0f));
+            Snap("Bracer_Armor_R", rightForearm, new Vector3(0.04f, 0.12f, 0f));
+
+            // Hide placeholder procedural limbs if present
+            string[] hidePrims = { "Torso_Base", "Pelvis_Base", "Arm_Upper_L", "Arm_Upper_R", "Thigh_L", "Thigh_R", "Calf_L", "Calf_R" };
+            foreach (var h in hidePrims)
+            {
+                Transform t = rig.Find(h);
+                if (t != null) t.gameObject.SetActive(false);
+            }
+
+            UnityEditor.SceneManagement.EditorSceneManager.SaveOpenScenes();
+            Debug.Log("<color=#00e5ff><b>[Night Warden]</b> Armor pieces successfully snapped to Mixamo skeleton!</color>");
+        }
     }
 }
 #endif
