@@ -58,17 +58,46 @@ namespace NightWarden.EditorTools
             // 3. Level Geometry: Industrial District
             GameObject envParent = new GameObject("--- DISTRICT_ENVIRONMENT ---");
 
-            // Main Ground Street
+            // Main Ground Street (100x100m)
             CreateStaticBox("Street_Ground", envParent.transform, new Vector3(0, -0.5f, 0), new Vector3(100, 1, 100), asphaltMat);
 
-            // Warehouse Structure
+            // Warehouse Structure (Open Industrial Depot with accessible doorways on all 4 sides)
             GameObject warehouse = new GameObject("Warehouse_Building");
             warehouse.transform.SetParent(envParent.transform);
-            CreateStaticBox("WH_Wall_North", warehouse.transform, new Vector3(0, 4.5f, 25), new Vector3(36, 9, 1), metalMat);
-            CreateStaticBox("WH_Wall_South", warehouse.transform, new Vector3(0, 4.5f, -5), new Vector3(36, 9, 1), metalMat);
-            CreateStaticBox("WH_Wall_East", warehouse.transform, new Vector3(18, 4.5f, 10), new Vector3(1, 9, 30), metalMat);
-            CreateStaticBox("WH_Wall_West", warehouse.transform, new Vector3(-18, 4.5f, 10), new Vector3(1, 9, 30), metalMat);
+
+            // South Wall (Main Entrance from Street): 12m wide opening from X=-6 to +6
+            CreateStaticBox("WH_Wall_South_L", warehouse.transform, new Vector3(-12f, 4.5f, -5f), new Vector3(12f, 9f, 1f), metalMat);
+            CreateStaticBox("WH_Wall_South_R", warehouse.transform, new Vector3(12f, 4.5f, -5f), new Vector3(12f, 9f, 1f), metalMat);
+            CreateStaticBox("WH_Wall_South_Lintel", warehouse.transform, new Vector3(0f, 7.5f, -5f), new Vector3(12f, 3f, 1f), metalMat);
+
+            // North Wall (Rear Exit to Extraction Courtyard): 10m wide opening from X=-5 to +5
+            CreateStaticBox("WH_Wall_North_L", warehouse.transform, new Vector3(-11.5f, 4.5f, 25f), new Vector3(13f, 9f, 1f), metalMat);
+            CreateStaticBox("WH_Wall_North_R", warehouse.transform, new Vector3(11.5f, 4.5f, 25f), new Vector3(13f, 9f, 1f), metalMat);
+            CreateStaticBox("WH_Wall_North_Lintel", warehouse.transform, new Vector3(0f, 7.5f, 25f), new Vector3(10f, 3f, 1f), metalMat);
+
+            // East Wall (Side Roll-Up Door to Shipping Container Yard): 10m wide opening from Z=5 to 15
+            CreateStaticBox("WH_Wall_East_S", warehouse.transform, new Vector3(18f, 4.5f, 0f), new Vector3(1f, 9f, 10f), metalMat);
+            CreateStaticBox("WH_Wall_East_N", warehouse.transform, new Vector3(18f, 4.5f, 20f), new Vector3(1f, 9f, 10f), metalMat);
+            CreateStaticBox("WH_Wall_East_Lintel", warehouse.transform, new Vector3(18f, 7.5f, 10f), new Vector3(1f, 3f, 10f), metalMat);
+
+            // West Wall (Side Door to Dark Alleyway): 10m wide opening from Z=5 to 15
+            CreateStaticBox("WH_Wall_West_S", warehouse.transform, new Vector3(-18f, 4.5f, 0f), new Vector3(1f, 9f, 10f), metalMat);
+            CreateStaticBox("WH_Wall_West_N", warehouse.transform, new Vector3(-18f, 4.5f, 20f), new Vector3(1f, 9f, 10f), metalMat);
+            CreateStaticBox("WH_Wall_West_Lintel", warehouse.transform, new Vector3(-18f, 7.5f, 10f), new Vector3(1f, 3f, 10f), metalMat);
+
+            // Warehouse Roof
             CreateStaticBox("WH_Roof", warehouse.transform, new Vector3(0, 9.5f, 10), new Vector3(38, 1, 32), metalMat);
+
+            // Interior Warehouse Lighting (Warm Industrial Overhead Tungsten Lamps)
+            CreateInteriorLamp("WH_Lamp_Front", warehouse.transform, new Vector3(0, 7f, 5f));
+            CreateInteriorLamp("WH_Lamp_Back", warehouse.transform, new Vector3(0, 7f, 18f));
+
+            // Interior & Street Tactical Cover Crates (Player can crouch behind)
+            Material crateMat = CreateMaterial("Mat_Crates", new Color(0.28f, 0.22f, 0.16f), 0.3f);
+            CreateStaticBox("Crate_WH_Stack1", warehouse.transform, new Vector3(-7f, 1f, 8f), new Vector3(2.4f, 2f, 2.4f), crateMat);
+            CreateStaticBox("Crate_WH_Stack2", warehouse.transform, new Vector3(8f, 1f, 16f), new Vector3(3f, 2f, 2f), crateMat);
+            CreateStaticBox("Crate_Street_Left", envParent.transform, new Vector3(-5f, 0.75f, -22f), new Vector3(1.5f, 1.5f, 3f), metalMat);
+            CreateStaticBox("Crate_Street_Right", envParent.transform, new Vector3(6f, 0.75f, -18f), new Vector3(2f, 1.5f, 2f), metalMat);
 
             // Alleyway Buildings
             CreateStaticBox("Building_Alley_Left", envParent.transform, new Vector3(-32, 7.5f, -15), new Vector3(16, 15, 45), brickMat);
@@ -94,10 +123,11 @@ namespace NightWarden.EditorTools
             var miniMap = managersObj.AddComponent<MiniMap>();
             var hudController = managersObj.AddComponent<HUDController>();
 
-            // 5. The Player: Night Warden
+            // 5. The Player: Night Warden (Spawned on Main Street facing North toward warehouse)
             GameObject playerObj = new GameObject("Player");
             playerObj.tag = "Player";
-            playerObj.transform.position = new Vector3(0, 1.0f, -42f);
+            playerObj.transform.position = new Vector3(0, 1.0f, -38f);
+            playerObj.transform.rotation = Quaternion.identity;
 
             var charCtrl = playerObj.AddComponent<CharacterController>();
             charCtrl.height = 1.8f;
@@ -171,31 +201,39 @@ namespace NightWarden.EditorTools
             var extField = typeof(GameManager).GetField("extractionPoint", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             extField?.SetValue(gameMgr, extractObj);
 
-            // 7. Armed Guards (4 Guards patrolling key areas)
+            // 7. Armed Guards (4 Guards patrolling key open areas with visible flashlights)
             GameObject guardsParent = new GameObject("--- ARMED_GUARDS ---");
-            CreateGuard("Guard_Warehouse_Patrol", guardsParent.transform, new Vector3(5, 1, 10), new Vector3[] {
-                new Vector3(10, 0, 10), new Vector3(-10, 0, 10), new Vector3(0, 0, 22), new Vector3(0, 0, 0)
+
+            // Guard 1: Patrols Main Street in front of the warehouse (directly visible from player spawn!)
+            CreateGuard("Guard_MainStreet_Patrol", guardsParent.transform, new Vector3(0, 1, -26), new Vector3[] {
+                new Vector3(14, 0, -26), new Vector3(-14, 0, -26), new Vector3(0, 0, -16), new Vector3(0, 0, -32)
             });
 
-            CreateGuard("Guard_Alley_Patrol", guardsParent.transform, new Vector3(-22, 1, -15), new Vector3[] {
-                new Vector3(-22, 0, -5), new Vector3(-22, 0, -32), new Vector3(-14, 0, -20)
+            // Guard 2: Patrols inside the open warehouse near Bomb #1
+            CreateGuard("Guard_Warehouse_Patrol", guardsParent.transform, new Vector3(4, 1, 10), new Vector3[] {
+                new Vector3(8, 0, 8), new Vector3(-8, 0, 8), new Vector3(-8, 0, 18), new Vector3(8, 0, 18)
             });
 
-            CreateGuard("Guard_Perimeter_East", guardsParent.transform, new Vector3(20, 1, -18), new Vector3[] {
-                new Vector3(25, 0, -10), new Vector3(25, 0, -30), new Vector3(12, 0, -25)
+            // Guard 3: Patrols Dark Alleyway near Bomb #2
+            CreateGuard("Guard_Alley_Patrol", guardsParent.transform, new Vector3(-24, 1, -15), new Vector3[] {
+                new Vector3(-24, 0, -6), new Vector3(-24, 0, -32), new Vector3(-18, 0, -20)
             });
 
-            CreateGuard("Guard_Roof_Watch", guardsParent.transform, new Vector3(0, 10.5f, 10), new Vector3[] {
-                new Vector3(10, 10, 10), new Vector3(-10, 10, 10), new Vector3(0, 10, 20)
+            // Guard 4: Patrols Shipping Docks near Bomb #3
+            CreateGuard("Guard_ShippingDocks_Patrol", guardsParent.transform, new Vector3(24, 1, -12), new Vector3[] {
+                new Vector3(24, 0, -4), new Vector3(24, 0, -28), new Vector3(16, 0, -16)
             });
 
             // 8. In-Game HUD & UI Canvas
             BuildNightWardenUI(hudController, miniMap);
 
-            // Apply Tactical Vigilante Visual Overhaul, Dynamic Cape, Cinematic Lighting & Post-Processing
+            // 9. Apply Tactical Vigilante Visual Overhaul, Dynamic Cape, Cinematic Lighting & Post-Processing
             NightWardenAssetGenerator.GenerateAllVisuals();
 
-            // 9. Save Scene
+            // 10. Bake NavMesh for active scene so guards immediately patrol & track
+            UnityEditor.AI.NavMeshBuilder.BuildNavMesh();
+
+            // 11. Save Scene
             string sceneDir = "Assets/Scenes";
             if (!Directory.Exists(sceneDir)) Directory.CreateDirectory(sceneDir);
             string scenePath = Path.Combine(sceneDir, "NightWardenLevel.unity");
@@ -213,7 +251,22 @@ namespace NightWarden.EditorTools
             obj.transform.position = pos;
             obj.transform.localScale = scale;
             if (mat != null) obj.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            GameObjectUtility.SetStaticEditorFlags(obj, StaticEditorFlags.NavigationStatic | StaticEditorFlags.ContributeGI);
             return obj;
+        }
+
+        private static GameObject CreateInteriorLamp(string name, Transform parent, Vector3 pos)
+        {
+            GameObject lamp = new GameObject(name);
+            lamp.transform.SetParent(parent);
+            lamp.transform.position = pos;
+            var light = lamp.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = new Color(1f, 0.72f, 0.45f);
+            light.intensity = 1.6f;
+            light.range = 18f;
+            light.shadows = LightShadows.Soft;
+            return lamp;
         }
 
         private static GameObject CreateBomb(string name, Transform parent, Vector3 pos, Material mat)
@@ -246,13 +299,39 @@ namespace NightWarden.EditorTools
             guard.transform.SetParent(parent);
             guard.transform.position = startPos;
 
-            var mat = CreateMaterial("Mat_GuardOutfit", new Color(0.45f, 0.15f, 0.15f), 0.2f); // Dark crimson
+            var mat = CreateMaterial("Mat_GuardOutfit", new Color(0.62f, 0.18f, 0.18f), 0.35f); // Visible dark crimson uniform
             guard.GetComponent<MeshRenderer>().sharedMaterial = mat;
 
+            // Tactical glowing visor on guard face
+            GameObject visor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            visor.name = "Guard_Visor";
+            visor.transform.SetParent(guard.transform);
+            visor.transform.localPosition = new Vector3(0f, 0.65f, 0.4f);
+            visor.transform.localScale = new Vector3(0.45f, 0.12f, 0.25f);
+            Object.DestroyImmediate(visor.GetComponent<Collider>());
+            var visorMat = CreateMaterial("Mat_GuardVisor", new Color(1.0f, 0.25f, 0.1f), 0.9f);
+            visorMat.EnableKeyword("_EMISSION");
+            visorMat.SetColor("_EmissionColor", new Color(1.0f, 0.3f, 0.1f) * 2.5f);
+            visor.GetComponent<MeshRenderer>().sharedMaterial = visorMat;
+
+            // Tactical Flashlight Spotlight (Illuminates streets and casts shadow beams through rain)
+            GameObject flObj = new GameObject("Guard_Flashlight");
+            flObj.transform.SetParent(guard.transform);
+            flObj.transform.localPosition = new Vector3(0f, 1.35f, 0.45f);
+            flObj.transform.localRotation = Quaternion.Euler(10f, 0f, 0f);
+            var fl = flObj.AddComponent<Light>();
+            fl.type = LightType.Spot;
+            fl.color = new Color(1f, 0.88f, 0.45f);
+            fl.intensity = 3.8f;
+            fl.range = 22f;
+            fl.spotAngle = 55f;
+            fl.shadows = LightShadows.Soft;
+
             var agent = guard.AddComponent<NavMeshAgent>();
-            agent.speed = 2.4f;
+            agent.speed = 2.2f;
             agent.radius = 0.45f;
             agent.height = 1.9f;
+            agent.stoppingDistance = 0.5f;
 
             var guardAI = guard.AddComponent<GuardAI>();
 

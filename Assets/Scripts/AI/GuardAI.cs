@@ -79,6 +79,21 @@ namespace NightWarden.AI
             if (audioSource == null) audioSource = GetComponent<AudioSource>();
 
             _flashlight = GetComponentInChildren<Light>();
+            if (_flashlight == null)
+            {
+                // Create tactical guard spotlight
+                GameObject flObj = new GameObject("Guard_Flashlight");
+                flObj.transform.SetParent(transform);
+                flObj.transform.localPosition = new Vector3(0f, 1.4f, 0.45f);
+                flObj.transform.localRotation = Quaternion.Euler(10f, 0f, 0f);
+                _flashlight = flObj.AddComponent<Light>();
+                _flashlight.type = LightType.Spot;
+                _flashlight.color = new Color(1f, 0.88f, 0.45f);
+                _flashlight.intensity = 3.8f;
+                _flashlight.range = 22f;
+                _flashlight.spotAngle = 55f;
+                _flashlight.shadows = LightShadows.Soft;
+            }
 
             InitProceduralAudio();
         }
@@ -137,11 +152,20 @@ namespace NightWarden.AI
 
         private void Update()
         {
-            if (_isEliminated || _agent == null || !_agent.isOnNavMesh) return;
+            if (_isEliminated || _agent == null) return;
+
+            // Ensure guard is on NavMesh; attempt recovery if agent slipped off
+            if (!_agent.isOnNavMesh)
+            {
+                if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
+                {
+                    _agent.Warp(hit.position);
+                }
+            }
 
             if (GameManager.Instance != null && GameManager.Instance.CurrentState != GameState.Playing)
             {
-                _agent.isStopped = true;
+                if (_agent.isOnNavMesh) _agent.isStopped = true;
                 return;
             }
 
@@ -149,7 +173,7 @@ namespace NightWarden.AI
             if (_isStunned)
             {
                 _stunTimer -= Time.deltaTime;
-                _agent.isStopped = true;
+                if (_agent.isOnNavMesh) _agent.isStopped = true;
                 if (_flashlight != null)
                 {
                     _flashlight.intensity = (Mathf.PingPong(Time.time * 8f, 1f) > 0.5f) ? 0.3f : 1.2f;
@@ -160,7 +184,7 @@ namespace NightWarden.AI
                 {
                     _isStunned = false;
                     _detectionProgress = 0f;
-                    _agent.isStopped = false;
+                    if (_agent.isOnNavMesh) _agent.isStopped = false;
                     if (_flashlight != null)
                     {
                         _flashlight.intensity = 2.4f;
@@ -171,7 +195,7 @@ namespace NightWarden.AI
                 return;
             }
 
-            _agent.isStopped = false;
+            if (_agent.isOnNavMesh) _agent.isStopped = false;
 
             // Continual vision & gradual detection check
             bool seesPlayer = CanSeePlayer();
