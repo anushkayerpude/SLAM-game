@@ -1,142 +1,95 @@
-# Echo: Dark Facility 📡🔦
+# Night Warden: Echo Protocol 🦇📡
 
-> **A 3D First-Person LiDAR Horror Game demonstrating Simultaneous Localization and Mapping (SLAM).**  
-> Built in **Unity 6 LTS (URP)** using **C#** for macOS (Apple Silicon & Intel) and Windows.
-
----
-
-## 1. Executive Summary
-
-**Echo: Dark Facility** is an atmospheric first-person horror exploration game that demonstrates real-world robotic SLAM principles through core gameplay mechanics.
-
-You wake up trapped in a pitch-black underground research facility. Normal ambient lighting does not exist. Your only tool for navigation is a **handheld 3D LiDAR scanner**. When you sweep or pulse the scanner, thousands of glowing laser hit points paint the walls, corridors, and objects around you in 3D, incrementally building a **point cloud** and a **3D voxel occupancy map**.
-
-However, active scanning emits acoustic noise across the facility. An invisible predatory entity hunts by sound. You must scan to see your path, find replacement fuses, power up the central generator, and locate the unlocked exit door before the creature tracks your acoustic emissions.
+> **A 3rd-Person Stealth Echolocation LiDAR Vigilante Game demonstrating Simultaneous Localization and Mapping (SLAM).**  
+> Built in **Unity 6 (URP)** using **100% C#** for macOS (Apple Silicon & Intel) and Windows.
 
 ---
 
-## 2. SLAM Concepts and Implementation Mapping
+## 1. Overview & Concept
 
-This project grounds academic SLAM concepts directly into gameplay systems:
+**Night Warden: Echo Protocol** is a dark, cinematic third-person stealth action game inspired by tactical vigilante thrillers. Set in a rain-slicked industrial district shrouded in total darkness, you play as the **Night Warden** — a masked operative equipped with a tactical cowl and a high-frequency acoustic LiDAR echolocation system.
 
-| SLAM Domain | Theoretical Foundation | In-Game Implementation (`Assets/Scripts/...`) |
+In this pitch-black environment, traditional vision is useless. You must navigate using your **Echo Pulse (`Q`)**, a 360-degree acoustic sweep that casts 1,500 spherical rays to map obstacles, alleys, rooftops, and threats as a persistent, high-density 3D point cloud.
+
+### The Stealth Dilemma
+Every pulse paints your environment, but sound carries. An Echo Pulse creates a loud acoustic disturbance (20m radius). Four to six armed syndicate guards patrol the sector on dynamic NavMesh patrol routes. If they hear your pulse or loud footsteps, they will switch states to **Investigate**, track your position, and enter **Chase** mode with flashlight beams and lethal gunfire.
+
+---
+
+## 2. SLAM Mechanics & Technical Architecture
+
+The game models real-world robotics and spatial perception principles directly in C#:
+
+| System | Technology & Theoretical Foundation | In-Game Implementation (`Assets/Scripts/...`) |
 | :--- | :--- | :--- |
-| **LiDAR Rangefinding** | Planar & 3D Time-of-Flight (ToF) range measurement | `LidarScanner.cs`: Casts 3D rays via continuous cone sweeps (1,500–3,000 rays/sec) and $360^\circ$ radial pulses. |
-| **Point Cloud Representation** | Dense 3D unorganized point collections $\{p_i = (x, y, z, c)\}$ | `PointCloudRenderer.cs`: Manages a high-capacity ring buffer (300,000 points) rendered on GPU particle chunks with distance and age blending. |
-| **Voxel Occupancy Mapping** | Volumetric Bayesian grid mapping $P(m_{xyz} \mid z_{1:t})$ | `VoxelMap.cs`: Discretizes continuous space into 0.5m voxels. Uses 3D-DDA raymarching to mark beam path as `Free` and impacts as `Occupied`. |
-| **Pose Tracking & Localization** | State estimation $\mathbf{x}_t = [x, y, z, \theta]^T$ inside the global frame | `PlayerController.cs`: Tracks character kinematic state, velocity, heading, and odometry in global coordinate space. |
-| **Map Slicing & Representation** | 2D projection of 3D point cloud for topological planning | `MapDisplay.cs`: Generates a real-time top-down 2D floor slice of the voxel grid displayed on the player's handheld terminal (`Tab`). |
-| **Acoustic Noise Constraints** | Sensor trade-offs and energy/emission footprints | `NoiseSystem.cs`: Propagates distance-attenuated acoustic waves whenever scanning or running, alerting the `MonsterAI`. |
+| **Acoustic LiDAR Pulse** | 360° spherical raycasting via Fibonacci lattice distribution | `SLAM/EchoPulse.cs`: Casts 1,500 rays over ~1.0s, draining tactical battery with automatic recharge. |
+| **Point Cloud Buffer** | High-capacity GPU particle chunk ring buffer (200,000 points) | `SLAM/PointCloudBuffer.cs`: Stores persistent points classified by semantic hit type with billboard distance attenuation. |
+| **Semantic Classification** | Real-time tag-based point filtering and color coding | `SLAM/EchoPulse.cs`: Blue-grey for architecture, yellow for bomb triggers, red for hostiles (visible through walls), cyan for climbable ledges. |
+| **3D Voxel Occupancy** | Volumetric discretization with 3D-DDA raymarching | `SLAM/VoxelMap.cs`: 0.5m grid recording `Free` and `Occupied` voxels with log-odds occupancy updates. |
+| **Top-Down MiniMap** | Real-time horizontal height-slice projection | `SLAM/MiniMap.cs`: Slices 3D voxel data into a 2D top-down navigational radar (`Tab`). |
+| **Acoustic Propagation** | Centralized quadratic inverse-square sound falloff | `Stealth/NoiseSystem.cs`: Dispatches noise events from pulses, sprinting, and defusals to alert the AI. |
+| **Guard AI State Machine** | Dynamic NavMesh agent perception (Vision cone + Sound hearing) | `AI/GuardAI.cs`: 5 states: `Patrol`, `Investigate`, `Chase`, `Search`, and `Eliminated`. |
+| **Takedown Mechanic** | Directional dot-product angle & distance verification | `Player/TakedownAction.cs`: Silent takedown (`F`) from behind crouched guards. |
+| **Mission Objective** | Multi-target interaction & shared countdown timer | `Objectives/BombObjective.cs` & `Core/GameManager.cs`: 3 bombs, 6:00 shared timer, extraction zone escape. |
 
 ---
 
-## 3. Project Architecture
+## 3. Controls
 
-The codebase follows clean C# software architecture separated by domain namespaces:
+| Action | Primary Input (Unified Input System) |
+| :--- | :--- |
+| **Move** | `W`, `A`, `S`, `D` / Arrow Keys |
+| **Look / Orbit Camera** | Mouse Delta |
+| **Sprint** | `Left Shift` (generates 8m noise radius) |
+| **Crouch** | `C` or `Left Ctrl` (reduces noise to ~1.5m; enables stealth) |
+| **Jump** | `Space` |
+| **Echo Pulse** | `Q` (360° LiDAR sweep, creates 20m acoustic disturbance) |
+| **Silent Takedown** | `F` (when crouched directly behind an unaware guard) |
+| **Defuse Bomb** | Hold `E` for 3.0 continuous seconds within 2.4m range |
+| **Toggle MiniMap** | `Tab` or `M` |
+| **Pause / Resume** | `Escape` |
+
+---
+
+## 4. Repository Structure
 
 ```
-Assets/Scripts/
-├── Player/
-│   ├── PlayerController.cs     # First-person character physics, sprint/crouch, mouse look, head bob
-│   └── LidarScanner.cs         # Handheld scanner firing sweep/pulse rays, battery energy management
-├── Mapping/
-│   ├── PointCloudRenderer.cs   # 300,000 point ring buffer with GPU particle system chunk allocation
-│   ├── VoxelMap.cs             # 3D voxel occupancy grid with 3D-DDA line traversal
-│   └── MapDisplay.cs           # Handheld terminal projecting 2D top-down map slice from voxel data
-├── AI/
-│   ├── MonsterAI.cs            # 4-state NavMesh machine (Patrol, Investigate, Hunt, Search)
-│   └── NoiseSystem.cs          # Centralized acoustic event dispatcher and falloff calculator
-├── Gameplay/
-│   ├── ObjectiveManager.cs     # Fuse discovery, generator power restoration, emergency lighting
-│   └── GameManager.cs          # State machine (Menu, Play, Pause, GameOver, Victory) and difficulty presets
-├── Audio/
-│   └── AudioManager.cs         # 3D spatial audio, dynamic proximity tension curve, scanner audio loops
-└── UI/
-    └── UIManager.cs            # Minimal HUD (battery, decibel meter, fuse counters), terminal map, menus
+Assets/
+├── Editor/
+│   └── NightWardenSceneBuilder.cs      # 1-click procedural level generator (alleys, warehouses, lighting, rain)
+├── Scenes/
+│   └── NightWardenLevel.unity          # Master game scene with baked NavMesh
+├── Scripts/
+│   ├── AI/
+│   │   └── GuardAI.cs                  # NavMesh 5-state AI (Patrol, Investigate, Chase, Search, Eliminated)
+│   ├── Core/
+│   │   └── GameManager.cs              # 6-minute mission timer, bomb counting, victory/defeat transitions
+│   ├── Objectives/
+│   │   ├── BombObjective.cs            # 3.0-second defuse interaction & progress tracking
+│   │   └── ExtractionPoint.cs          # Final extraction beacon triggered upon all bombs defused
+│   ├── Player/
+│   │   ├── ThirdPersonPlayerController.cs # Kinematic movement, sprint, crouch, footstep audio & noise
+│   │   ├── ThirdPersonCameraFollow.cs  # Smooth collision-avoiding orbital follow camera
+│   │   ├── TakedownAction.cs           # Stealth rear-angle assassination detection
+│   │   └── WardenInput.cs              # Dual-compatibility input wrapper (New Input System & Legacy)
+│   ├── SLAM/
+│   │   ├── EchoPulse.cs                # 1,500-ray 360° LiDAR pulse with semantic tagging
+│   │   ├── PointCloudBuffer.cs         # 200,000-point GPU particle chunk buffer
+│   │   ├── VoxelMap.cs                 # 3D occupancy grid with 3D-DDA raymarching
+│   │   └── MiniMap.cs                  # 2D top-down real-time height-sliced radar
+│   ├── Stealth/
+│   │   └── NoiseSystem.cs              # Global acoustic event bus with distance attenuation
+│   └── UI/
+│       └── HUDController.cs            # Battery meter, 6:00 countdown, bomb tracker, noise meter, prompt UI
+└── Settings/                           # Universal Render Pipeline (URP) configuration assets
 ```
 
 ---
 
-## 4. Controls
+## 5. How to Play in Unity
 
-| Action | Input (Keyboard & Mouse) | Description |
-| :--- | :--- | :--- |
-| **Move** | `W`, `A`, `S`, `D` | First-person movement |
-| **Look** | Mouse | First-person camera look |
-| **Sprint** | Hold `Left Shift` | Increases speed; generates loud footstep noise |
-| **Crouch** | `C` or `Left Ctrl` | Lowers profile; near-silent movement |
-| **LiDAR Sweep** | Hold `Left Mouse Button` | Continuous cone scatter; low continuous noise |
-| **LiDAR Pulse** | `Right Mouse Button` or `Space` | $360^\circ$ radial burst; reveals large area; high noise spike |
-| **Handheld Map** | `Tab` or `M` | Toggles the 2D top-down SLAM terminal display |
-| **Interact** | `E` | Pick up fuses, insert into generator, open exit door |
-| **Pause** | `Escape` | Toggles the pause menu |
-
----
-
-## 5. Visual Point Cloud Color Classification
-
-Hit points are automatically categorized and colored in real time:
-
-- ⚪ **White / Pale Cyan**: Static facility geometry (walls, floors, ceilings, obstacles).
-- 🔵 **Cyan**: Collectible items and interactive equipment.
-- 🟡 **Yellow**: Critical mission objectives (fuses, generator, exit door).
-- 🔴 **Red**: The hostile creature (revealed only when hit by laser rays).
-
----
-
-## 6. Unity 6 Project Setup Guide
-
-### 6.1 Prerequisites
-1. Install **Unity Hub** from [unity.com](https://unity.com).
-2. Install **Unity 6 LTS** (Apple Silicon editor version recommended on Mac; Windows editor on PC).
-3. Clone or open this repository in Unity Hub.
-
-### 6.2 Scene Setup & Component Wiring
-1. **Scene Creation**:
-   - Create a new 3D scene configured for Universal Render Pipeline (URP).
-   - Set the Main Camera background / Environment Lighting to solid black (`#000000`) and ambient intensity to 0 to create total darkness.
-
-2. **Configure Unity Tags**:
-   - Navigate to **Edit** &rarr; **Project Settings** &rarr; **Tags and Layers**.
-   - Add the following tags:
-     - `Player`
-     - `Monster`
-     - `Fuse`
-     - `Generator`
-     - `ExitDoor`
-     - `Objective`
-
-3. **Hierarchy Layout**:
-   - **Player**:
-     - Attach `CharacterController`, `PlayerController.cs`, and `LidarScanner.cs`.
-     - Child Camera with AudioListener.
-   - **Managers**:
-     - Create an empty GameObject `Managers` and attach:
-       - `PointCloudRenderer.cs`
-       - `VoxelMap.cs`
-       - `NoiseSystem.cs`
-       - `ObjectiveManager.cs`
-       - `GameManager.cs`
-       - `AudioManager.cs`
-       - `UIManager.cs`
-       - `MapDisplay.cs`
-   - **Monster**:
-     - Create a GameObject with `NavMeshAgent` and `MonsterAI.cs`. Tag as `Monster`.
-     - Assign patrol waypoint transforms.
-   - **Environment**:
-     - Construct rooms and corridors using ProBuilder or basic 3D Cubes with BoxColliders.
-     - Bake the NavMesh via **Window** &rarr; **AI** &rarr; **Navigation**.
-
----
-
-## 7. Performance Targets
-
-- **Frame Rate**: Locked 60 FPS at 1080p on Apple Silicon Mac (M1 or newer) and Windows PCs.
-- **Point Capacity**: 300,000 points actively rendered without frame drops.
-- **Memory Footprint**: Sparse voxel hashing maintains low memory usage even in large facilities.
-
----
-
-## 8. License
-
-This project is released under the [MIT License](LICENSE). Developed as an educational 3rd-year SLAM robotics demonstration game.
+1. Open **Unity Hub** and select Unity **6000.6.11f1** (or any Unity 6 LTS release).
+2. Open the project folder.
+3. In the Project window, navigate to `Assets/Scenes/NightWardenLevel.unity` and double-click to open.
+4. Press **Play** (`⌘+P` on Mac or `Ctrl+P` on Windows).
+5. Navigate the pitch-black district with `W/A/S/D`, press `Q` to reveal your surroundings, defuse all 3 explosive devices, eliminate or evade guards, and reach the Extraction Point!
