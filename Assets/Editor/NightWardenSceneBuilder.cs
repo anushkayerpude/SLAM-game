@@ -207,6 +207,18 @@ namespace NightWarden.EditorTools
             var extractCol = extractObj.GetComponent<Collider>();
             extractCol.isTrigger = true;
             extractObj.AddComponent<ExtractionPoint>();
+
+            // Upward green beacon light to make extraction visible across the district
+            GameObject extLight = new GameObject("Extraction_BeaconLight");
+            extLight.transform.SetParent(extractObj.transform, false);
+            extLight.transform.localPosition = new Vector3(0f, 2.5f, 0f);
+            var bLight = extLight.AddComponent<Light>();
+            bLight.type = LightType.Point;
+            bLight.color = new Color(0.1f, 1.0f, 0.45f);
+            bLight.range = 22f;
+            bLight.intensity = 2.8f;
+            bLight.shadows = LightShadows.Soft;
+
             extractObj.SetActive(false);
 
             // Connect Extraction point to GameManager

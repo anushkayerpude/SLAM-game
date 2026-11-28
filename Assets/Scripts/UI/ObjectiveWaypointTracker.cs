@@ -30,6 +30,7 @@ namespace NightWarden.UI
         private float _bannerTimer = 0f;
         private float _smokeAlertTimer = 0f;
         private float _empPurgeTimer = 0f;
+        private float _extractionAlertTimer = 0f;
         private float _respawnAlertTimer = 0f;
         private GUIStyle _markerStyle;
         private GUIStyle _bgStyle;
@@ -74,7 +75,14 @@ namespace NightWarden.UI
 
         private void HandleBombProgressChanged(int defused, int total)
         {
-            _empPurgeTimer = 5.0f;
+            if (defused >= total)
+            {
+                _extractionAlertTimer = 10.0f;
+            }
+            else
+            {
+                _empPurgeTimer = 5.0f;
+            }
         }
 
         private void HandlePlayerRespawned()
@@ -180,6 +188,7 @@ namespace NightWarden.UI
             if (_bannerTimer > 0f) _bannerTimer -= Time.deltaTime;
             if (_smokeAlertTimer > 0f) _smokeAlertTimer -= Time.deltaTime;
             if (_empPurgeTimer > 0f) _empPurgeTimer -= Time.deltaTime;
+            if (_extractionAlertTimer > 0f) _extractionAlertTimer -= Time.deltaTime;
             if (_respawnAlertTimer > 0f) _respawnAlertTimer -= Time.deltaTime;
         }
 
@@ -226,7 +235,14 @@ namespace NightWarden.UI
 
         private void DrawEMPAlertBanner()
         {
-            if (_empPurgeTimer > 0f)
+            if (_extractionAlertTimer > 0f)
+            {
+                float width = 740f;
+                float height = 48f;
+                Rect rect = new Rect((Screen.width - width) * 0.5f, 120f, width, height);
+                GUI.Box(rect, "🚁 ALL BOMBS DEFUSED! HEAD TO THE GREEN EXTRACTION ZONE AT THE NORTH COURTYARD!", _smokeStyle);
+            }
+            else if (_empPurgeTimer > 0f)
             {
                 float width = 640f;
                 float height = 46f;
