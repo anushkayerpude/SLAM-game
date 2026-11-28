@@ -102,22 +102,26 @@ namespace NightWarden.EditorTools
 
             // Interior & Street Tactical Cover Crates (Player can crouch behind)
             Material crateMat = CreateMaterial("Mat_Crates", new Color(0.28f, 0.22f, 0.16f), 0.3f);
-            CreateStaticBox("Crate_WH_Stack1", warehouse.transform, new Vector3(-7f, 1f, 8f), new Vector3(2.4f, 2f, 2.4f), crateMat);
-            CreateStaticBox("Crate_WH_Stack2", warehouse.transform, new Vector3(8f, 1f, 16f), new Vector3(3f, 2f, 2f), crateMat);
+            CreateStaticBox("Crate_WH_Stack1", warehouse.transform, new Vector3(-9f, 1f, 8f), new Vector3(2.4f, 2f, 2.4f), crateMat);
+            CreateStaticBox("Crate_WH_Stack2", warehouse.transform, new Vector3(9f, 1f, 16f), new Vector3(3f, 2f, 2f), crateMat);
             CreateStaticBox("Crate_Street_Left", envParent.transform, new Vector3(-5f, 0.75f, -22f), new Vector3(1.5f, 1.5f, 3f), metalMat);
             CreateStaticBox("Crate_Street_Right", envParent.transform, new Vector3(6f, 0.75f, -18f), new Vector3(2f, 1.5f, 2f), metalMat);
+            CreateStaticBox("Crate_Alley_Cover", envParent.transform, new Vector3(-26.5f, 0.6f, -32f), new Vector3(1.6f, 1.2f, 1.6f), crateMat);
 
-            // Alleyway Buildings
-            CreateStaticBox("Building_Alley_Left", envParent.transform, new Vector3(-32, 7.5f, -15), new Vector3(16, 15, 45), brickMat);
-            CreateStaticBox("Building_Alley_Right", envParent.transform, new Vector3(-18, 6f, -30), new Vector3(10, 12, 35), brickMat);
-            CreateStaticBox("Building_Docks", envParent.transform, new Vector3(30, 8f, -15), new Vector3(18, 16, 50), brickMat);
+            // Alleyway Buildings (Spaced generously to guarantee wide 9m navigable corridors with zero obstacle clipping)
+            CreateStaticBox("Building_Alley_Left", envParent.transform, new Vector3(-38f, 8f, -20f), new Vector3(14f, 16f, 44f), brickMat);
+            CreateStaticBox("Building_Alley_Right", envParent.transform, new Vector3(-18f, 6.5f, -28f), new Vector3(8f, 13f, 30f), brickMat);
+            CreateStaticBox("Building_Docks", envParent.transform, new Vector3(36f, 8f, -15f), new Vector3(14f, 16f, 44f), brickMat);
 
-            // Climbable Ledges (Tagged Ledge for cyan echolocation)
-            GameObject ledge1 = CreateStaticBox("Ledge_WH_Container", warehouse.transform, new Vector3(12, 1.5f, -3), new Vector3(6, 3, 4), ledgeMat);
+            // Climbable Ledges & Containers (Tagged Ledge for cyan echolocation)
+            GameObject ledge1 = CreateStaticBox("Ledge_WH_Container", warehouse.transform, new Vector3(20f, 1.5f, 0f), new Vector3(3f, 3f, 6f), ledgeMat);
             ledge1.tag = "Ledge";
 
-            GameObject ledge2 = CreateStaticBox("Ledge_Alley_FireEscape", envParent.transform, new Vector3(-23, 3f, -15), new Vector3(2, 6, 8), ledgeMat);
+            GameObject ledge2 = CreateStaticBox("Ledge_Alley_FireEscape", envParent.transform, new Vector3(-30f, 2.5f, -14f), new Vector3(2f, 5f, 6f), ledgeMat);
             ledge2.tag = "Ledge";
+
+            GameObject containerYard = CreateStaticBox("Container_Docks_Yard", envParent.transform, new Vector3(25f, 1.5f, -26f), new Vector3(3f, 3f, 7f), metalMat);
+            containerYard.tag = "Ledge";
 
             // Rain Particle System
             CreateRainSystem(envParent.transform);
@@ -182,15 +186,15 @@ namespace NightWarden.EditorTools
             camObj.AddComponent<AudioListener>();
             var camFollow = camObj.AddComponent<ThirdPersonCameraFollow>();
 
-            // 6. Objectives: 3 Bombs & Extraction Point
+            // 6. Objectives: 3 Bombs & Extraction Point (Guaranteed open space, 0% obstacle overlap)
             GameObject objParent = new GameObject("--- OBJECTIVES ---");
 
-            // Bomb 1: Inside the Warehouse
-            GameObject bomb1 = CreateBomb("Bomb_Warehouse", objParent.transform, new Vector3(0f, 0.5f, 15f), bombMat);
-            // Bomb 2: Dark Alleyway
-            GameObject bomb2 = CreateBomb("Bomb_Alley", objParent.transform, new Vector3(-25f, 0.5f, -22f), bombMat);
-            // Bomb 3: Shipping Ledge Area
-            GameObject bomb3 = CreateBomb("Bomb_ContainerLedge", objParent.transform, new Vector3(25f, 0.5f, -8f), bombMat);
+            // Bomb 1: Inside Open Warehouse Depot Floor
+            GameObject bomb1 = CreateBomb("Bomb_Warehouse", objParent.transform, new Vector3(0f, 0.5f, 14f), bombMat);
+            // Bomb 2: Crime Alleyway (Dead center in 9m wide alleyway, 4.5m clearance to walls)
+            GameObject bomb2 = CreateBomb("Bomb_Alley", objParent.transform, new Vector3(-26.5f, 0.5f, -22f), bombMat);
+            // Bomb 3: Shipping Docks Yard (Dead center in 11m wide container yard, 5.5m clearance to walls)
+            GameObject bomb3 = CreateBomb("Bomb_ContainerLedge", objParent.transform, new Vector3(23.5f, 0.5f, -12f), bombMat);
 
             // Extraction Beacon
             GameObject extractObj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -214,22 +218,22 @@ namespace NightWarden.EditorTools
 
             // Guard 1: Patrols Main Street in front of the warehouse (directly visible from player spawn!)
             CreateGuard("Guard_MainStreet_Patrol", guardsParent.transform, new Vector3(0, 1, -26), new Vector3[] {
-                new Vector3(14, 0, -26), new Vector3(-14, 0, -26), new Vector3(0, 0, -16), new Vector3(0, 0, -32)
+                new Vector3(10, 0, -26), new Vector3(-10, 0, -26), new Vector3(0, 0, -16), new Vector3(0, 0, -34)
             });
 
             // Guard 2: Patrols inside the open warehouse near Bomb #1
             CreateGuard("Guard_Warehouse_Patrol", guardsParent.transform, new Vector3(4, 1, 10), new Vector3[] {
-                new Vector3(8, 0, 8), new Vector3(-8, 0, 8), new Vector3(-8, 0, 18), new Vector3(8, 0, 18)
+                new Vector3(6, 0, 8), new Vector3(-6, 0, 8), new Vector3(-6, 0, 18), new Vector3(6, 0, 18)
             });
 
-            // Guard 3: Patrols Dark Alleyway near Bomb #2
-            CreateGuard("Guard_Alley_Patrol", guardsParent.transform, new Vector3(-24, 1, -15), new Vector3[] {
-                new Vector3(-24, 0, -6), new Vector3(-24, 0, -32), new Vector3(-18, 0, -20)
+            // Guard 3: Patrols Dark Alleyway along open center corridor near Bomb #2
+            CreateGuard("Guard_Alley_Patrol", guardsParent.transform, new Vector3(-26.5f, 1, -16), new Vector3[] {
+                new Vector3(-26.5f, 0, -8), new Vector3(-26.5f, 0, -22), new Vector3(-26.5f, 0, -34), new Vector3(-20, 0, -10)
             });
 
-            // Guard 4: Patrols Shipping Docks near Bomb #3
-            CreateGuard("Guard_ShippingDocks_Patrol", guardsParent.transform, new Vector3(24, 1, -12), new Vector3[] {
-                new Vector3(24, 0, -4), new Vector3(24, 0, -28), new Vector3(16, 0, -16)
+            // Guard 4: Patrols Shipping Docks along open center yard near Bomb #3
+            CreateGuard("Guard_ShippingDocks_Patrol", guardsParent.transform, new Vector3(23.5f, 1, -12), new Vector3[] {
+                new Vector3(23.5f, 0, -4), new Vector3(23.5f, 0, -12), new Vector3(23.5f, 0, -24), new Vector3(18, 0, 8)
             });
 
             // 8. In-Game HUD & UI Canvas
@@ -294,23 +298,43 @@ namespace NightWarden.EditorTools
 
         private static GameObject CreateBomb(string name, Transform parent, Vector3 pos, Material mat)
         {
+            // Grounded wooden pallet base for realistic placement
+            GameObject pallet = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            pallet.name = name + "_Pallet";
+            pallet.transform.SetParent(parent);
+            pallet.transform.position = pos + Vector3.down * 0.35f;
+            pallet.transform.localScale = new Vector3(1.3f, 0.25f, 1.3f);
+            pallet.layer = 2; // Ignore raycast
+
             GameObject bomb = GameObject.CreatePrimitive(PrimitiveType.Cube);
             bomb.name = name;
             bomb.tag = "Bomb";
             bomb.transform.SetParent(parent);
             bomb.transform.position = pos;
-            bomb.transform.localScale = new Vector3(0.8f, 0.6f, 0.8f);
+            bomb.transform.localScale = new Vector3(0.85f, 0.65f, 0.85f);
             if (mat != null) bomb.GetComponent<MeshRenderer>().sharedMaterial = mat;
 
             // Beeping blinking LED on bomb
             GameObject led = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            led.name = "Bomb_LED";
             led.transform.SetParent(bomb.transform);
             led.transform.localPosition = new Vector3(0f, 0.6f, 0f);
             led.transform.localScale = Vector3.one * 0.35f;
             Object.DestroyImmediate(led.GetComponent<Collider>());
             led.GetComponent<MeshRenderer>().sharedMaterial = mat;
 
-            bomb.AddComponent<BombObjective>();
+            // Amber Hazard Point Light for dramatic visual feedback
+            GameObject lightObj = new GameObject("Bomb_HazardLight");
+            lightObj.transform.SetParent(bomb.transform);
+            lightObj.transform.localPosition = new Vector3(0f, 0.7f, 0f);
+            var pLight = lightObj.AddComponent<Light>();
+            pLight.type = LightType.Point;
+            pLight.color = new Color(1.0f, 0.65f, 0.05f); // Amber hazard
+            pLight.range = 6.0f;
+            pLight.intensity = 1.4f;
+
+            var bombComp = bomb.AddComponent<BombObjective>();
+            bombComp.Configure(2.2f, 3.5f);
             return bomb;
         }
 

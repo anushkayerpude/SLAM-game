@@ -14,27 +14,36 @@ namespace NightWarden.Objectives
     public class BombObjective : MonoBehaviour
     {
         [Header("Defusal Settings")]
-        [SerializeField] private float defuseTimeRequired = 3.0f;
-        [SerializeField] private float interactionRange = 2.4f;
+        [SerializeField] private float defuseTimeRequired = 2.2f;
+        [SerializeField] private float interactionRange = 3.5f;
 
-        [Header("Audio Feedback")]
+        [Header("Audio & Visual Feedback")]
         [SerializeField] private AudioSource audioSource;
         [SerializeField] private AudioClip defusedSound;
+        [SerializeField] private Light hazardLight;
 
         private float _currentDefuseProgress = 0f;
         private bool _isDefused = false;
         private bool _isBeingDefused = false;
         private Transform _playerTransform;
+        private float _lightPulseTimer = 0f;
 
         public bool IsDefused => _isDefused;
         public float DefuseProgressNormalized => Mathf.Clamp01(_currentDefuseProgress / defuseTimeRequired);
         public bool IsPlayerInRange { get; private set; }
+
+        public void Configure(float timeRequired, float range)
+        {
+            defuseTimeRequired = timeRequired;
+            interactionRange = range;
+        }
 
         private void Start()
         {
             var player = GameObject.FindWithTag("Player");
             if (player != null) _playerTransform = player.transform;
             if (audioSource == null) audioSource = GetComponent<AudioSource>();
+            if (hazardLight == null) hazardLight = GetComponentInChildren<Light>();
 
             if (defusedSound == null)
             {
@@ -69,6 +78,14 @@ namespace NightWarden.Objectives
         {
             if (_isDefused || _playerTransform == null) return;
 
+            // Pulse Hazard Light to make bomb easily visible in the dark
+            if (hazardLight != null)
+            {
+                _lightPulseTimer += Time.deltaTime * 3.5f;
+                float intensityMultiplier = _isBeingDefused ? 2.5f : 1.0f;
+                hazardLight.intensity = (0.8f + Mathf.PingPong(_lightPulseTimer, 0.8f)) * intensityMultiplier;
+            }
+
             float distance = Vector3.Distance(transform.position, _playerTransform.position);
             IsPlayerInRange = distance <= interactionRange;
 
@@ -97,6 +114,12 @@ namespace NightWarden.Objectives
         {
             _isDefused = true;
             _isBeingDefused = false;
+
+            if (hazardLight != null)
+            {
+                hazardLight.color = new Color(0.1f, 1.0f, 0.4f); // Green safe beacon
+                hazardLight.intensity = 0.5f;
+            }
 
             if (audioSource != null && defusedSound != null)
             {
