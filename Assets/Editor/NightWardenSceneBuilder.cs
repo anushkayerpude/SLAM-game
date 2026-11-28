@@ -192,6 +192,9 @@ namespace NightWarden.EditorTools
             // 8. In-Game HUD & UI Canvas
             BuildNightWardenUI(hudController, miniMap);
 
+            // Apply Tactical Vigilante Visual Overhaul, Dynamic Cape, Cinematic Lighting & Post-Processing
+            NightWardenAssetGenerator.GenerateAllVisuals();
+
             // 9. Save Scene
             string sceneDir = "Assets/Scenes";
             if (!Directory.Exists(sceneDir)) Directory.CreateDirectory(sceneDir);

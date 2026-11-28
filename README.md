@@ -51,45 +51,76 @@ The game models real-world robotics and spatial perception principles directly i
 
 ---
 
-## 4. Repository Structure
+## 4. Character Visuals & Mixamo Humanoid Import Guide
 
-```
-Assets/
-├── Editor/
-│   └── NightWardenSceneBuilder.cs      # 1-click procedural level generator (alleys, warehouses, lighting, rain)
-├── Scenes/
-│   └── NightWardenLevel.unity          # Master game scene with baked NavMesh
-├── Scripts/
-│   ├── AI/
-│   │   └── GuardAI.cs                  # NavMesh 5-state AI (Patrol, Investigate, Chase, Search, Eliminated)
-│   ├── Core/
-│   │   └── GameManager.cs              # 6-minute mission timer, bomb counting, victory/defeat transitions
-│   ├── Objectives/
-│   │   ├── BombObjective.cs            # 3.0-second defuse interaction & progress tracking
-│   │   └── ExtractionPoint.cs          # Final extraction beacon triggered upon all bombs defused
-│   ├── Player/
-│   │   ├── ThirdPersonPlayerController.cs # Kinematic movement, sprint, crouch, footstep audio & noise
-│   │   ├── ThirdPersonCameraFollow.cs  # Smooth collision-avoiding orbital follow camera
-│   │   ├── TakedownAction.cs           # Stealth rear-angle assassination detection
-│   │   └── WardenInput.cs              # Dual-compatibility input wrapper (New Input System & Legacy)
-│   ├── SLAM/
-│   │   ├── EchoPulse.cs                # 1,500-ray 360° LiDAR pulse with semantic tagging
-│   │   ├── PointCloudBuffer.cs         # 200,000-point GPU particle chunk buffer
-│   │   ├── VoxelMap.cs                 # 3D occupancy grid with 3D-DDA raymarching
-│   │   └── MiniMap.cs                  # 2D top-down real-time height-sliced radar
-│   ├── Stealth/
-│   │   └── NoiseSystem.cs              # Global acoustic event bus with distance attenuation
-│   └── UI/
-│       └── HUDController.cs            # Battery meter, 6:00 countdown, bomb tracker, noise meter, prompt UI
-└── Settings/                           # Universal Render Pipeline (URP) configuration assets
-```
+The Night Warden features a grounded, modular AAA tactical aesthetic built from script-free URP/Lit materials and an articulated low-poly armor rig:
+- **Cowl**: Full head cowl with sharp, angular ears (angled 8° back and 14° outward) and angled cold-white emissive eye lenses (`#EEF6FF` with HDR emission intensity `2.5`).
+- **Segmented Armor**: Upper pectoral chest plate, sternum ridge, abdominal armor tiers, and tactical shoulder pauldrons.
+- **Stealth Bracers & Gloves**: Reinforced forearm gauntlets with scalloped blade ridges and tactical gloves.
+- **Utility Belt**: Dark gunmetal center buckle with 4 modular equipment pouches.
+- **Tactical Cape**: 4-segment bone-chain cape attached to upper back/shoulders driven by `CapeSway.cs` spring-damper physics with double-sided rendering (`_Cull = 0`).
+
+### Mixamo Character Import Steps (Optional FBX Upgrade)
+If you wish to swap the procedural tactical under-rig for an animated Mixamo humanoid character:
+1. Go to [Mixamo.com](https://www.mixamo.com) and search for **"Y Bot"**, **"SWAT"**, or **"Vanguard"**.
+2. Download the model as **FBX for Unity (.fbx)** in T-Pose.
+3. Drag the `.fbx` into your Unity Project at `Assets/Models/`.
+4. Select the FBX file in Unity's Project window and open the **Inspector**:
+   - Go to the **Rig** tab.
+   - Set **Animation Type** to `Humanoid`.
+   - Set **Avatar Definition** to `Create From This Model`.
+   - Click **Apply**.
+5. Drag the imported character prefab into the scene under `Player`.
+6. Parent the tactical child armor meshes from `Vigilante_VisualRig` to the corresponding bones:
+   - `Cowl_Head` & `Cowl_Ear_L/R` & `Cowl_EyeLens_L/R` $\rightarrow$ Parent to `mixamorig:Head`.
+   - `Armor_ChestPlate`, `Armor_AbPlate_*`, `Vigilante_Cape` $\rightarrow$ Parent to `mixamorig:Spine2` (Chest).
+   - `UtilityBelt_Strap` $\rightarrow$ Parent to `mixamorig:Hips`.
+   - `Bracer_Armor_L/R` $\rightarrow$ Parent to `mixamorig:LeftForeArm` / `mixamorig:RightForeArm`.
 
 ---
 
-## 5. How to Play in Unity
+## 5. Lighting, Post-Processing & Atmosphere Specifications
 
-1. Open **Unity Hub** and select Unity **6000.6.11f1** (or any Unity 6 LTS release).
-2. Open the project folder.
-3. In the Project window, navigate to `Assets/Scenes/NightWardenLevel.unity` and double-click to open.
-4. Press **Play** (`⌘+P` on Mac or `Ctrl+P` on Windows).
-5. Navigate the pitch-black district with `W/A/S/D`, press `Q` to reveal your surroundings, defuse all 3 explosive devices, eliminate or evade guards, and reach the Extraction Point!
+### 1. Cinematic Lighting
+- **Cold Moonlight**: Directional light at rotation `(52, -32, 0)`, Color `#7BAEF2` (RGB: 0.48, 0.68, 0.95), Intensity `0.28`, Soft Shadows enabled, Normal Bias `0.4`.
+- **Cyan Rim Light**: Follows player high-rear at `(0, 2.2, -1.8)` angled `38°` down. Spot Light, Color `#47E0F2` (Warm Cyan), Intensity `0.45`, Range `4.8m`, Spot Angle `68°`. Separates the dark vigilante silhouette from the pitch-black district without flooding ambient darkness.
+- **URP Shadow Distance**: Configured to `40m` in `PC_RPAsset.asset` for crisp close-range character and architecture shadows with zero performance waste on Apple Silicon.
+- **Reflection Probe**: Box projection (`120m × 30m × 120m`) capturing dark district ambient specular reflections on wet asphalt and suit armor plates.
+- **Light Probe Group**: 3D grid across street and warehouse entrances for dynamic spherical harmonics shading on character movement.
+
+### 2. Global Post-Processing Volume
+Configured in `Assets/Settings/DefaultVolumeProfile.asset` and applied globally:
+- **Bloom**: Threshold `0.9`, Intensity `0.5`, Scatter `0.7` (eye lenses and bomb LEDs glow softly).
+- **Vignette**: Intensity `0.35`, Smoothness `0.4` (darkens screen edges for claustrophobic focus).
+- **Film Grain**: Thin1, Intensity `0.15` (cinematic gritty film texture).
+- **Color Adjustments**: Contrast `12`, Saturation `-15` (subtle gritty desaturation), Color Filter `#D9EBFF` (cold blue-teal night grade).
+- **Tonemapping**: ACES (filmic high-dynamic range response).
+- **Depth of Field**: Gaussian, Start `12m`, End `45m` (subtle atmospheric depth blur on distant buildings).
+- **Motion Blur**: Camera and Objects, Quality `Low`, Intensity `0.18` (high-speed camera orbit smoothness).
+
+### 3. Wet City Atmosphere
+- **Fog**: Exponential Squared, Density `0.024`, Color `(0.025, 0.038, 0.065)` (dark industrial midnight mist).
+- **Camera-Following Rain**: 3,000 velocity-stretched particles tracking the Main Camera for dense rain streaks without wasting particles across empty geometry.
+- **Ground Rain Splashes**: Localized particle system (120 particles max) parented to the player, triggering rapid ground ripples on wet surfaces.
+- **Wet Asphalt Ground**: URP Lit material with normal map `T_Asphalt_Normal.png`, Smoothness `0.85`, providing slick reflections under the moonlight.
+
+### 4. Echo Look Integration
+- Point cloud buffer utilizes unlit additive billboard particles (`Universal Render Pipeline/Particles/Unlit`).
+- The player character, armor meshes, and cape are set to **Layer 2 (`Ignore Raycast`)**, and `EchoPulse.cs` explicitly masks out Layer 2 so the player's own body is never rendered into the point cloud.
+
+---
+
+## 6. Verification Checklist in Play Mode
+
+1. **Press Play (`⌘+P`)**:
+   - Verify character renders in dark tactical charcoal suit with matte armor plates and cold-white glowing eye lenses.
+   - Verify faint warm-cyan rim light highlights the vigilante silhouette against the pitch-black background.
+2. **Movement & Cape Physics**:
+   - Move with `W/A/S/D` and sprint with `Shift`: verify the cape naturally sways, drags, and flutters behind the character via `CapeSway.cs` without clipping through the legs.
+3. **Atmospheric Rain**:
+   - Observe rain streaks falling around the camera view and rain splashes on the ground around the player.
+4. **Echo Pulse (`Q`)**:
+   - Press `Q`: 1,500 acoustic rays expand outwards. Verify the environment maps in blue-grey, guards in red, and bombs in yellow.
+   - Verify the Night Warden's own body produces **zero** points in the point cloud.
+5. **Frame Rate**:
+   - Runs locked at 60 fps on Apple Silicon Macs.
