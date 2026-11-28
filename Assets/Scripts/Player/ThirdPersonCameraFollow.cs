@@ -10,11 +10,11 @@ namespace NightWarden.Player
     {
         [Header("Target & Offsets")]
         [SerializeField] private Transform target;
-        [SerializeField] private Vector3 targetOffset = new Vector3(0f, 1.6f, 0f);
+        [SerializeField] private Vector3 targetOffset = new Vector3(0.25f, 1.35f, 0f);
 
         [Header("Distance & Orbit")]
-        [SerializeField] private float defaultDistance = 4.2f;
-        [SerializeField] private float minDistance = 0.8f;
+        [SerializeField] private float defaultDistance = 3.5f;
+        [SerializeField] private float minDistance = 0.6f;
         [SerializeField] private float mouseSensitivity = 2.4f;
         [SerializeField] private float minPitch = -30f;
         [SerializeField] private float maxPitch = 70f;

@@ -16,15 +16,15 @@ namespace NightWarden.SLAM
     {
         [Header("Pulse Parameters")]
         [SerializeField] private int rayCount = 1500;
-        [SerializeField] private float maxRange = 30f;
-        [SerializeField] private float waveSpeed = 30f; // Travels 30m over ~1 second
-        [SerializeField] private float cooldownDuration = 3.0f;
+        [SerializeField] private float maxRange = 32f;
+        [SerializeField] private float waveSpeed = 32f; // Travels 32m over ~1 second
+        [SerializeField] private float cooldownDuration = 1.6f;
         [SerializeField] private LayerMask hitLayers = ~0;
 
         [Header("Battery & Energy")]
         [SerializeField] private float maxBattery = 100f;
-        [SerializeField] private float pulseBatteryCost = 25f;
-        [SerializeField] private float batteryRechargeRate = 12f;
+        [SerializeField] private float pulseBatteryCost = 20f;
+        [SerializeField] private float batteryRechargeRate = 18f;
 
         [Header("Semantic Color Classification")]
         [SerializeField] private Color environmentColor = new Color(0.55f, 0.72f, 0.95f, 0.9f); // Blue-grey

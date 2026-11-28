@@ -7,6 +7,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using NightWarden.Player;
 using NightWarden.SLAM;
+using NightWarden.UI;
 
 namespace NightWarden.EditorTools
 {
@@ -366,11 +367,11 @@ namespace NightWarden.EditorTools
 
             // 1. Atmosphere: RenderSettings Fog
             RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.025f, 0.04f, 0.07f);
+            RenderSettings.ambientLight = new Color(0.045f, 0.065f, 0.10f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogColor = new Color(0.025f, 0.038f, 0.065f);
-            RenderSettings.fogDensity = 0.024f;
+            RenderSettings.fogDensity = 0.018f; // Tuned for better medium-range district readability
 
             // 2. Moonlight Directional Light
             GameObject moonObj = GameObject.Find("Directional_Moonlight");
@@ -378,8 +379,8 @@ namespace NightWarden.EditorTools
             var moonLight = moonObj.GetComponent<Light>();
             if (moonLight == null) moonLight = moonObj.AddComponent<Light>();
             moonLight.type = LightType.Directional;
-            moonLight.color = new Color(0.48f, 0.68f, 0.95f); // Cold blue moonlight
-            moonLight.intensity = 0.28f; // Low intensity so district remains realistically dark
+            moonLight.color = new Color(0.50f, 0.70f, 0.96f); // Cold blue moonlight
+            moonLight.intensity = 0.42f; // Increased slightly so buildings and streets are legible
             moonLight.shadows = LightShadows.Soft;
             moonLight.shadowNormalBias = 0.4f;
             moonObj.transform.rotation = Quaternion.Euler(52f, -32f, 0f);
@@ -449,17 +450,33 @@ namespace NightWarden.EditorTools
                 Transform oldBody = playerObj.transform.Find("Vigilante_Body");
                 if (oldBody != null) Object.DestroyImmediate(oldBody.gameObject);
 
+                Transform oldRig = playerObj.transform.Find("Vigilante_VisualRig");
+                if (oldRig != null) Object.DestroyImmediate(oldRig.gameObject);
+
                 Transform oldCape = playerObj.transform.Find("Vigilante_Cape");
                 if (oldCape != null) Object.DestroyImmediate(oldCape.gameObject);
 
                 Transform oldRim = playerObj.transform.Find("Player_RimLight");
                 if (oldRim != null) Object.DestroyImmediate(oldRim.gameObject);
 
-                // Build New Grounded Tactical Vigilante Visual Rig
+                Transform oldSonar = playerObj.transform.Find("Player_CowlSonarLight");
+                if (oldSonar != null) Object.DestroyImmediate(oldSonar.gameObject);
+
+                // Configure Player CharacterController for reduced, nimble vigilante scale
+                var charCtrl = playerObj.GetComponent<CharacterController>();
+                if (charCtrl != null)
+                {
+                    charCtrl.height = 1.55f;
+                    charCtrl.radius = 0.32f;
+                    charCtrl.center = Vector3.up * 0.775f;
+                }
+
+                // Build New Grounded Tactical Vigilante Visual Rig (Scaled down to 0.82)
                 GameObject rigRoot = new GameObject("Vigilante_VisualRig");
                 rigRoot.transform.SetParent(playerObj.transform, false);
                 rigRoot.transform.localPosition = Vector3.zero;
                 rigRoot.transform.localRotation = Quaternion.identity;
+                rigRoot.transform.localScale = Vector3.one * 0.82f; // Reduced size as requested!
 
                 // --- Base Body / Under-suit (Dark Tactical Fabric) ---
                 GameObject torso = CreateVisualChild("Torso_Base", rigRoot.transform, PrimitiveType.Cube, 
@@ -569,25 +586,85 @@ namespace NightWarden.EditorTools
                 // --- Faint Warm-Cyan Rim Light (Follows Player for Silhouette Separation) ---
                 GameObject rimLightObj = new GameObject("Player_RimLight");
                 rimLightObj.transform.SetParent(playerObj.transform, false);
-                // Position high and slightly behind player pointing forward down
-                rimLightObj.transform.localPosition = new Vector3(0f, 2.2f, -1.8f);
+                rimLightObj.transform.localPosition = new Vector3(0f, 1.85f, -1.5f);
                 rimLightObj.transform.localRotation = Quaternion.Euler(38f, 0f, 0f);
 
                 var rimLight = rimLightObj.AddComponent<Light>();
                 rimLight.type = LightType.Spot;
                 rimLight.color = new Color(0.28f, 0.88f, 0.95f); // Warm-cyan / vibrant stealth teal
-                rimLight.intensity = 0.45f; // Faint, subtle rim
-                rimLight.range = 4.8f;
+                rimLight.intensity = 0.45f;
+                rimLight.range = 4.5f;
                 rimLight.spotAngle = 68f;
                 rimLight.innerSpotAngle = 35f;
-                rimLight.shadows = LightShadows.None; // Low-overhead rim light
+                rimLight.shadows = LightShadows.None;
+
+                // --- Passive Cowl Sonar / Visor Ambient Light (Allows close-range vision without pitch black blindness) ---
+                GameObject sonarLightObj = new GameObject("Player_CowlSonarLight");
+                sonarLightObj.transform.SetParent(playerObj.transform, false);
+                sonarLightObj.transform.localPosition = new Vector3(0f, 1.1f, 0.35f);
+                var sonarLight = sonarLightObj.AddComponent<Light>();
+                sonarLight.type = LightType.Point;
+                sonarLight.color = new Color(0.40f, 0.70f, 0.92f); // Dark subtle cowl blue-cyan
+                sonarLight.intensity = 0.55f;
+                sonarLight.range = 9.0f;
+                sonarLight.shadows = LightShadows.None;
 
                 // Ensure all created children are set to Ignore Raycast layer (Layer 2)
                 SetLayerRecursively(rigRoot, 2);
                 SetLayerRecursively(rimLightObj, 2);
+                SetLayerRecursively(sonarLightObj, 2);
             }
 
-            // 8. Rain Particles (Following Main Camera) & Ground Splashes
+            // 8. ThirdPersonCamera Follow Tuning for Smaller Character
+            GameObject camObj = GameObject.FindWithTag("MainCamera");
+            if (camObj != null)
+            {
+                var camFollow = camObj.GetComponent<ThirdPersonCameraFollow>();
+                if (camFollow != null)
+                {
+                    var offsetField = typeof(ThirdPersonCameraFollow).GetField("targetOffset", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    offsetField?.SetValue(camFollow, new Vector3(0.25f, 1.35f, 0f));
+
+                    var distField = typeof(ThirdPersonCameraFollow).GetField("defaultDistance", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    distField?.SetValue(camFollow, 3.5f);
+                }
+            }
+
+            // 9. Guard Patrol Flashlights (Makes stealth readable, guards visible & fair)
+            GameObject guardsParent = GameObject.Find("--- ARMED_GUARDS ---");
+            if (guardsParent != null)
+            {
+                foreach (Transform guard in guardsParent.transform)
+                {
+                    if (!guard.name.Contains("Guard")) continue;
+                    Transform oldFlashlight = guard.Find("Guard_Flashlight");
+                    if (oldFlashlight != null) Object.DestroyImmediate(oldFlashlight.gameObject);
+
+                    GameObject flashObj = new GameObject("Guard_Flashlight");
+                    flashObj.transform.SetParent(guard, false);
+                    flashObj.transform.localPosition = new Vector3(0f, 1.3f, 0.35f);
+                    flashObj.transform.localRotation = Quaternion.Euler(6f, 0f, 0f);
+
+                    var fl = flashObj.AddComponent<Light>();
+                    fl.type = LightType.Spot;
+                    fl.color = new Color(1.0f, 0.94f, 0.75f); // Warm tungsten guard flashlight
+                    fl.intensity = 1.4f;
+                    fl.range = 14f;
+                    fl.spotAngle = 50f;
+                    fl.innerSpotAngle = 24f;
+                    fl.shadows = LightShadows.Soft;
+                }
+            }
+
+            // 10. Objective Waypoint Tracker on HUD Canvas (Makes mission easy to navigate)
+            GameObject canvasObj = GameObject.Find("Canvas_NightWardenHUD");
+            if (canvasObj != null)
+            {
+                var tracker = canvasObj.GetComponent<ObjectiveWaypointTracker>();
+                if (tracker == null) canvasObj.AddComponent<ObjectiveWaypointTracker>();
+            }
+
+            // 11. Rain Particles (Following Main Camera) & Ground Splashes
             SetupAtmosphericRainAndSplashes();
         }
 
@@ -725,81 +802,6 @@ namespace NightWarden.EditorTools
             {
                 SetLayerRecursively(child.gameObject, layer);
             }
-        }
-
-        [MenuItem("Night Warden/Auto-Snap Armor to Mixamo Rig", false, 2)]
-        public static void AutoSnapArmorToMixamoRig()
-        {
-            GameObject playerObj = GameObject.FindWithTag("Player");
-            if (playerObj == null)
-            {
-                Debug.LogError("[Night Warden] No GameObject with tag 'Player' found in scene.");
-                return;
-            }
-
-            Transform rig = playerObj.transform.Find("Vigilante_VisualRig");
-            if (rig == null)
-            {
-                Debug.LogError("[Night Warden] 'Vigilante_VisualRig' not found under Player.");
-                return;
-            }
-
-            // Find all bones recursively under Player
-            Transform FindBone(string namePattern)
-            {
-                foreach (Transform t in playerObj.GetComponentsInChildren<Transform>(true))
-                {
-                    if (t.name.ToLower().Contains(namePattern.ToLower())) return t;
-                }
-                return null;
-            }
-
-            Transform headBone = FindBone("Head");
-            Transform chestBone = FindBone("Spine2") ?? FindBone("Chest") ?? FindBone("Spine1");
-            Transform hipsBone = FindBone("Hips");
-            Transform leftForearm = FindBone("LeftForeArm") ?? FindBone("Forearm.L");
-            Transform rightForearm = FindBone("RightForeArm") ?? FindBone("Forearm.R");
-
-            if (headBone == null && chestBone == null)
-            {
-                Debug.LogWarning("[Night Warden] No Mixamo humanoid skeleton detected under Player. Make sure your imported FBX is placed as a child of 'Player' and its Rig is set to Humanoid.");
-                return;
-            }
-
-            // Snap armor pieces
-            void Snap(string pieceName, Transform targetBone, Vector3 localOffset)
-            {
-                if (targetBone == null) return;
-                Transform piece = null;
-                foreach (Transform t in rig.GetComponentsInChildren<Transform>(true))
-                {
-                    if (t.name == pieceName) { piece = t; break; }
-                }
-                if (piece != null)
-                {
-                    piece.SetParent(targetBone, false);
-                    piece.localPosition = localOffset;
-                    Debug.Log($"[Night Warden] Snapped {pieceName} to {targetBone.name}");
-                }
-            }
-
-            Snap("Cowl_Head", headBone, new Vector3(0f, 0.08f, 0.02f));
-            Snap("Armor_ChestPlate", chestBone, new Vector3(0f, 0.12f, 0.12f));
-            Snap("Vigilante_Cape", chestBone, new Vector3(0f, 0.18f, -0.15f));
-            Snap("UtilityBelt_Strap", hipsBone, new Vector3(0f, 0.05f, 0f));
-            Snap("Bracer_Armor_L", leftForearm, new Vector3(-0.04f, 0.12f, 0f));
-            Snap("Bracer_Armor_R", rightForearm, new Vector3(0.04f, 0.12f, 0f));
-
-            // Hide placeholder procedural limbs if present
-            string[] hidePrims = { "Torso_Base", "Pelvis_Base", "Arm_Upper_L", "Arm_Upper_R", "Thigh_L", "Thigh_R", "Calf_L", "Calf_R" };
-            foreach (var h in hidePrims)
-            {
-                Transform t = rig.Find(h);
-                if (t != null) t.gameObject.SetActive(false);
-            }
-
-            UnityEditor.SceneManagement.EditorSceneManager.SaveOpenScenes();
-            Debug.Log("<color=#00e5ff><b>[Night Warden]</b> Armor pieces successfully snapped to Mixamo skeleton!</color>");
         }
     }
 }

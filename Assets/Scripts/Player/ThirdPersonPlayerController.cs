@@ -18,8 +18,8 @@ namespace NightWarden.Player
         [SerializeField] private float gravity = -18f;
 
         [Header("Crouch Configuration")]
-        [SerializeField] private float standingHeight = 1.8f;
-        [SerializeField] private float crouchHeight = 1.0f;
+        [SerializeField] private float standingHeight = 1.55f;
+        [SerializeField] private float crouchHeight = 0.90f;
         [SerializeField] private float crouchTransitionSpeed = 10f;
 
         [Header("Rotation & Camera")]
